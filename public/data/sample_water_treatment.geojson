@@ -1,0 +1,9 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"name":"Catskill-Delaware Water Treatment Facility","type":"Drinking Water Treatment","capacity_mgd":2100,"source":"Catskill & Delaware Aqueducts","state":"NY","operator":"NYC DEP"},"geometry":{"type":"Point","coordinates":[-73.98,41.11]}},
+    {"type":"Feature","properties":{"name":"Jensen Water Treatment Plant","type":"Drinking Water Treatment","capacity_mgd":750,"source":"State Water Project / Colorado River","state":"CA","operator":"MWD of Southern California"},"geometry":{"type":"Point","coordinates":[-118.53,34.28]}},
+    {"type":"Feature","properties":{"name":"Hawthorne WTP","type":"Drinking Water Treatment","capacity_mgd":120,"source":"Missouri River","state":"MO","operator":"Kansas City Water"},"geometry":{"type":"Point","coordinates":[-94.62,39.14]}},
+    {"type":"Feature","properties":{"name":"H.B. Zachry Water Purification Plant","type":"Drinking Water Treatment","capacity_mgd":225,"source":"Edwards Aquifer / Guadalupe","state":"TX","operator":"San Antonio Water System"},"geometry":{"type":"Point","coordinates":[-98.55,29.45]}}
+  ]
+}

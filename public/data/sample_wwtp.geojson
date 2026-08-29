@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"name":"Blue Plains Advanced WWTP","type":"Wastewater Treatment","capacity_mgd":370,"state":"DC","influent":"Combined/Separate","effluent":"Potomac River","operator":"DC Water"},"geometry":{"type":"Point","coordinates":[-77.015,38.82]}},
+    {"type":"Feature","properties":{"name":"Hyperion Water Reclamation Plant","type":"Wastewater Treatment","capacity_mgd":450,"state":"CA","influent":"Municipal","effluent":"Santa Monica Bay / Reuse","operator":"LA Sanitation"},"geometry":{"type":"Point","coordinates":[-118.43,33.93]}},
+    {"type":"Feature","properties":{"name":"Stickney Water Reclamation Plant","type":"Wastewater Treatment","capacity_mgd":1200,"state":"IL","influent":"Municipal","effluent":"Chicago Sanitary & Ship Canal","operator":"MWRD"},"geometry":{"type":"Point","coordinates":[-87.82,41.81]}},
+    {"type":"Feature","properties":{"name":"Deer Island Treatment Plant","type":"Wastewater Treatment","capacity_mgd":1270,"state":"MA","influent":"Municipal","effluent":"Boston Harbor","operator":"MWRA"},"geometry":{"type":"Point","coordinates":[-70.96,42.35]}},
+    {"type":"Feature","properties":{"name":"Southside WWTP (Houston)","type":"Wastewater Treatment","capacity_mgd":200,"state":"TX","influent":"Municipal","effluent":"Houston Ship Channel","operator":"City of Houston"},"geometry":{"type":"Point","coordinates":[-95.28,29.71]}}
+  ]
+}

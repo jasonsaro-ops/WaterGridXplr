@@ -1,0 +1,23 @@
+{
+  "national": {
+    "avg_residential_cost_per_ccf": 3.85,
+    "avg_residential_cost_per_1000gal": 5.15,
+    "source": "AWWA 2024 / Circle of Blue surveys (approx national avg)",
+    "notes": "Varies widely by utility; check local rates"
+  },
+  "usgs_water_use_2015": {
+    "total_withdrawals_bgd": 322,
+    "public_supply_bgd": 39,
+    "irrigation_bgd": 118,
+    "thermoelectric_bgd": 133,
+    "industrial_bgd": 14.8,
+    "source": "USGS Circular 1441 (2015 estimates; next national update pending)"
+  },
+  "states_sample": [
+    {"state":"CA","avg_cost_per_ccf":4.20,"public_supply_mgd":5200,"notes":"High variability; MWD wholesale rates public"},
+    {"state":"TX","avg_cost_per_ccf":3.10,"public_supply_mgd":4100,"notes":"Groundwater heavy in many regions"},
+    {"state":"NY","avg_cost_per_ccf":4.80,"public_supply_mgd":2800,"notes":"NYC DEP rates published"},
+    {"state":"FL","avg_cost_per_ccf":3.40,"public_supply_mgd":2500,"notes":"Many desalination plants"},
+    {"state":"AZ","avg_cost_per_ccf":3.90,"public_supply_mgd":1200,"notes":"CAP & groundwater"}
+  ]
+}

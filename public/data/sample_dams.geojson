@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"name":"Hoover Dam","nid_id":"NV10122","height_ft":726,"storage_af":28845000,"purpose":"Hydroelectric, Irrigation, Flood Control, Water Supply","state":"NV/AZ","owner":"US Bureau of Reclamation"},"geometry":{"type":"Point","coordinates":[-114.737,36.016]}},
+    {"type":"Feature","properties":{"name":"Grand Coulee Dam","nid_id":"WA00268","height_ft":550,"storage_af":9562000,"purpose":"Hydroelectric, Irrigation, Flood Control","state":"WA","owner":"US Bureau of Reclamation"},"geometry":{"type":"Point","coordinates":[-118.982,47.956]}},
+    {"type":"Feature","properties":{"name":"Glen Canyon Dam","nid_id":"AZ10307","height_ft":710,"storage_af":27000000,"purpose":"Hydroelectric, Water Supply, Flood Control","state":"AZ","owner":"US Bureau of Reclamation"},"geometry":{"type":"Point","coordinates":[-111.484,36.937]}},
+    {"type":"Feature","properties":{"name":"Oroville Dam","nid_id":"CA00215","height_ft":770,"storage_af":3537577,"purpose":"Water Supply, Hydroelectric, Flood Control","state":"CA","owner":"CA DWR"},"geometry":{"type":"Point","coordinates":[-121.486,39.54]}},
+    {"type":"Feature","properties":{"name":"Shasta Dam","nid_id":"CA10186","height_ft":602,"storage_af":4552000,"purpose":"Water Supply, Hydroelectric, Flood Control, Irrigation","state":"CA","owner":"US Bureau of Reclamation"},"geometry":{"type":"Point","coordinates":[-122.419,40.718]}}
+  ]
+}

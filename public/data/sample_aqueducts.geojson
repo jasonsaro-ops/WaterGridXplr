@@ -1,0 +1,9 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"name":"California Aqueduct","type":"Aqueduct","length_mi":444,"operator":"CA DWR","states":"CA"},"geometry":{"type":"LineString","coordinates":[[-121.5,37.8],[-120.5,36.5],[-119.5,35.5],[-118.5,34.5],[-117.5,34.0]]}},
+    {"type":"Feature","properties":{"name":"Colorado River Aqueduct","type":"Aqueduct","length_mi":242,"operator":"MWD","states":"CA/AZ"},"geometry":{"type":"LineString","coordinates":[[-114.7,34.3],[-116.0,34.0],[-117.0,34.1],[-117.8,34.05]]}},
+    {"type":"Feature","properties":{"name":"Catskill Aqueduct","type":"Aqueduct","length_mi":92,"operator":"NYC DEP","states":"NY"},"geometry":{"type":"LineString","coordinates":[[-74.4,41.9],[-74.1,41.5],[-73.95,41.2],[-73.9,41.0]]}},
+    {"type":"Feature","properties":{"name":"Central Arizona Project","type":"Aqueduct/Canal","length_mi":336,"operator":"CAP","states":"AZ"},"geometry":{"type":"LineString","coordinates":[[-114.5,34.3],[-112.5,33.5],[-111.5,33.4],[-110.8,32.5]]}}
+  ]
+}
