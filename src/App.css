@@ -238,30 +238,53 @@
 
 /* Popup */
 .water-popup {
-  max-width: 280px;
-  font-size: 0.8rem;
+  max-width: 300px;
+  font-size: 0.82rem;
+  color: #0f172a;
+  line-height: 1.35;
 }
 
 .water-popup h3 {
-  margin: 0 0 0.4rem;
-  font-size: 0.95rem;
-  color: #0c1222;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #020617;
 }
 
 .water-popup .meta-row {
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.2rem;
+  gap: 0.75rem;
+  margin-bottom: 0.28rem;
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .water-popup .meta-key {
-  color: #64748b;
+  color: #334155;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .water-popup .meta-val {
-  font-weight: 600;
+  color: #0f172a;
+  font-weight: 500;
   text-align: right;
+  word-break: break-word;
+}
+
+/* MapLibre popup shell */
+.maplibregl-popup-content {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
+  padding: 12px 14px !important;
+}
+.maplibregl-popup-close-button {
+  color: #0f172a !important;
+  font-size: 18px !important;
+  padding: 4px 8px !important;
 }
 
 /* Legend */

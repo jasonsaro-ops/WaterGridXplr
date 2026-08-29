@@ -6,6 +6,35 @@ import './App.css';
 
 const BASE = import.meta.env.BASE_URL;
 
+const US_STATES: { code: string; name: string }[] = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' }, { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' },
+  { code: 'DC', name: 'District of Columbia' }, { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' }, { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' }, { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' }, { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' }, { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' }, { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' }, { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+];
+
 const LAYER_COLORS = {
   wwtp: '#f97316',
   wwtp_pa: '#fb923c',
@@ -14,34 +43,75 @@ const LAYER_COLORS = {
   aqueducts: '#22d3ee',
   pa_pws: '#38bdf8',
   cws: '#14b8a6',
+  state: '#2dd4bf',
 } as const;
 
-type LayerId = keyof typeof LAYER_COLORS;
+type CoreLayerId = 'wwtp' | 'wwtp_pa' | 'treatment' | 'dams' | 'aqueducts' | 'pa_pws' | 'cws';
 
 interface PopupInfo {
   longitude: number;
   latitude: number;
   properties: Record<string, unknown>;
-  layer: string;
 }
 
-const INITIAL_VIEW = {
-  longitude: -98.5,
-  latitude: 39.5,
-  zoom: 3.6,
+const INITIAL_VIEW = { longitude: -98.5, latitude: 39.5, zoom: 3.6 };
+
+const LABEL_MAP: Record<string, string> = {
+  CWP_NAME: 'Name',
+  name: 'Name',
+  NAME: 'Name',
+  PWS_Name: 'System name',
+  PWSID: 'PWS ID',
+  Primacy_Agency: 'Primacy agency',
+  Population_Served_Count: 'Population served',
+  Service_Connections_Count: 'Service connections',
+  Service_Area_Type: 'Service area type',
+  Verification_Status: 'Verification',
+  Area_SqKM: 'Area (km²)',
+  nidId: 'NID ID',
+  state: 'State',
+  county: 'County',
+  city: 'City',
+  nidHeight: 'Height (ft)',
+  primaryPurposeId: 'Primary purpose',
+  ownerNames: 'Owner',
+  publicHazardId: 'Hazard class',
+  latitude: 'Latitude',
+  longitude: 'Longitude',
+  CNTY_NAME: 'County',
+  OWNERSHIP: 'Ownership',
+  GW_SOURCE: 'Groundwater source',
+  SW_SOURCE: 'Surface water source',
+  WUDS_ID: 'WUDS ID',
+  NPDES_ID: 'NPDES ID',
+  CWP_CITY: 'City',
+  CWP_STATE: 'State',
+  CWP_ZIP: 'ZIP',
+  CWP_COUNTY: 'County',
+  CWP_FACILITY_TYPE_INDICATOR: 'Facility type',
+  CWP_MAJOR_MINOR_STATUS: 'Major/Minor',
+  CWP_PERMIT_STATUS_DESC: 'Permit status',
+  STATE_WATER_BODY_NAME: 'Receiving water',
 };
 
 function prettyProps(props: Record<string, unknown>): [string, string][] {
-  const skip = new Set(['OBJECTID', 'OBJECTID_1', 'Shape__Area', 'Shape__Length']);
-  return Object.entries(props)
-    .filter(([k, v]) => !skip.has(k) && v != null && String(v).trim() !== '')
-    .map(([k, v]) => [k.replace(/^CWP_/, '').replace(/_/g, ' '), String(v)]);
+  const skip = new Set([
+    'OBJECTID', 'OBJECTID_1', 'Shape__Area', 'Shape__Length',
+    'name', 'NAME', 'CWP_NAME', 'PWS_Name', // shown as title
+  ]);
+  const rows: [string, string][] = [];
+  for (const [k, v] of Object.entries(props)) {
+    if (skip.has(k) || v == null || String(v).trim() === '') continue;
+    const label = LABEL_MAP[k] || k.replace(/^CWP_/, '').replace(/_/g, ' ');
+    rows.push([label, String(v)]);
+  }
+  return rows;
 }
 
 export default function App() {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(INITIAL_VIEW);
-  const [layers, setLayers] = useState<Record<LayerId, boolean>>({
+  const [layers, setLayers] = useState<Record<CoreLayerId, boolean>>({
     wwtp: true,
     wwtp_pa: false,
     treatment: false,
@@ -50,17 +120,26 @@ export default function App() {
     pa_pws: true,
     cws: true,
   });
+  // All state layers OFF by default
+  const [stateLayers, setStateLayers] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(US_STATES.map((s) => [s.code, false]))
+  );
   const [popup, setPopup] = useState<PopupInfo | null>(null);
   const [searchQ, setSearchQ] = useState('');
-  const [status] = useState('Live public GIS · Full NID · EPA CWS · EPA WWTP · PA DEP');
+  const [status] = useState('Public GIS · NID · EPA CWS · PA DEP');
+  const [showStates, setShowStates] = useState(false);
 
-  const toggleLayer = useCallback((id: LayerId) => {
+  const toggleLayer = useCallback((id: CoreLayerId) => {
     setLayers((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const toggleState = useCallback((code: string) => {
+    setStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
   }, []);
 
   const onMapClick = useCallback((e: MapLayerMouseEvent) => {
     const feat = e.features?.[0];
-    if (!feat || !feat.properties) {
+    if (!feat?.properties) {
       setPopup(null);
       return;
     }
@@ -68,7 +147,6 @@ export default function App() {
       longitude: e.lngLat.lng,
       latitude: e.lngLat.lat,
       properties: feat.properties as Record<string, unknown>,
-      layer: String(feat.layer?.id ?? 'feature'),
     });
   }, []);
 
@@ -85,9 +163,8 @@ export default function App() {
       });
       const data = await res.json();
       if (data?.[0]) {
-        const { lon, lat } = data[0];
         mapRef.current?.flyTo({
-          center: [parseFloat(lon), parseFloat(lat)],
+          center: [parseFloat(data[0].lon), parseFloat(data[0].lat)],
           zoom: 10,
           duration: 1500,
         });
@@ -106,8 +183,16 @@ export default function App() {
     if (layers.dams) ids.push('dams-points');
     if (layers.aqueducts) ids.push('aqueducts-lines');
     if (layers.pa_pws) ids.push('pa-pws-fill', 'pa-pws-outline');
+    for (const s of US_STATES) {
+      if (stateLayers[s.code]) ids.push(`state-${s.code}-points`);
+    }
     return ids;
-  }, [layers]);
+  }, [layers, stateLayers]);
+
+  const enabledStateCount = useMemo(
+    () => Object.values(stateLayers).filter(Boolean).length,
+    [stateLayers]
+  );
 
   return (
     <div className="app">
@@ -161,10 +246,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <p className="sources-note">
-              USGS water-use (2015) · AWWA rate surveys · NID/NTAD · EPA FRS/ICIS.
-              Local rates vary widely.
-            </p>
           </div>
 
           <div className="section">
@@ -184,17 +265,17 @@ export default function App() {
           </div>
 
           <div className="section">
-            <div className="section-title">Infrastructure layers (public GIS)</div>
+            <div className="section-title">National layers</div>
             <div className="layer-list">
               {(
                 [
-                  { id: 'cws' as LayerId, label: 'CWS service centroids (EPA)', note: '~41k national' },
-                  { id: 'dams' as LayerId, label: 'All NID dams', note: '92,766 national' },
-                  { id: 'wwtp' as LayerId, label: 'WWTP Majors (EPA FRS/ICIS)', note: '2,000 national' },
-                  { id: 'pa_pws' as LayerId, label: 'PA PWS service areas', note: '300 polygons' },
-                  { id: 'wwtp_pa' as LayerId, label: 'PA wastewater plants', note: '~974 PA' },
-                  { id: 'aqueducts' as LayerId, label: 'Major aqueduct corridors', note: 'illustrative' },
-                  { id: 'treatment' as LayerId, label: 'Drinking WTP samples', note: 'demo plants' },
+                  { id: 'cws' as CoreLayerId, label: 'CWS systems (all states)', note: '~41k EPA' },
+                  { id: 'dams' as CoreLayerId, label: 'All NID dams', note: '92,766' },
+                  { id: 'wwtp' as CoreLayerId, label: 'WWTP Majors (EPA)', note: '2,000' },
+                  { id: 'pa_pws' as CoreLayerId, label: 'PA service area polygons', note: 'DEP' },
+                  { id: 'wwtp_pa' as CoreLayerId, label: 'PA wastewater plants', note: '~974' },
+                  { id: 'aqueducts' as CoreLayerId, label: 'Major aqueducts', note: 'sample' },
+                  { id: 'treatment' as CoreLayerId, label: 'Drinking WTP samples', note: 'demo' },
                 ] as const
               ).map((l) => (
                 <label key={l.id} className="layer-item">
@@ -203,25 +284,64 @@ export default function App() {
                     checked={layers[l.id]}
                     onChange={() => toggleLayer(l.id)}
                   />
-                  <span
-                    className="layer-swatch"
-                    style={{ background: LAYER_COLORS[l.id] }}
-                  />
+                  <span className="layer-swatch" style={{ background: LAYER_COLORS[l.id] }} />
                   <span className="layer-label">{l.label}</span>
                   <span className="layer-count">{l.note}</span>
                 </label>
               ))}
             </div>
+          </div>
+
+          <div className="section">
+            <div className="section-title">
+              State CWS layers (default OFF)
+              <button
+                type="button"
+                className="section-toggle"
+                onClick={() => setShowStates((v) => !v)}
+                style={{
+                  marginLeft: 8,
+                  fontSize: 11,
+                  background: '#0f2744',
+                  border: '1px solid #1e3a5f',
+                  color: '#7dd3fc',
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                  cursor: 'pointer',
+                }}
+              >
+                {showStates ? 'Hide' : 'Show'} ({enabledStateCount} on)
+              </button>
+            </div>
+            {showStates && (
+              <div className="layer-list" style={{ maxHeight: 280, overflowY: 'auto' }}>
+                {US_STATES.map((s) => (
+                  <label key={s.code} className="layer-item">
+                    <input
+                      type="checkbox"
+                      checked={!!stateLayers[s.code]}
+                      onChange={() => toggleState(s.code)}
+                    />
+                    <span
+                      className="layer-swatch"
+                      style={{ background: LAYER_COLORS.state }}
+                    />
+                    <span className="layer-label">
+                      {s.name} ({s.code})
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
             <p className="sources-note">
-              Real data from EPA FRS/ICIS (wastewater), USACE/BTS NID via NTAD
-              (dams), and PA DEP eMapPA / PASDA (public water supplier service
-              areas). Expand with full national EPA service-area boundaries,
-              state portals, USGS NHD, and OSM. See README.
+              Per-state layers use EPA Community Water System records (PWSID, name,
+              population served, connections, area). PA also has DEP service-area
+              polygons. Enable only the states you need.
             </p>
           </div>
 
           <div className="section">
-            <div className="section-title">Water costs & usage metadata</div>
+            <div className="section-title">Water costs & usage</div>
             <div className="costs-panel">
               <div className="row">
                 <span>National avg (approx)</span>
@@ -240,8 +360,7 @@ export default function App() {
                 <span>~133 BGD</span>
               </div>
               <p className="note">
-                Click map features for facility metadata (name, NPDES, permit
-                status, height, purpose, ownership). Full retail rates live in
+                Click map features for system/dam metadata. Retail rates are in
                 utility tariffs and state PUC filings.
               </p>
             </div>
@@ -268,23 +387,12 @@ export default function App() {
           <NavigationControl position="top-right" />
 
           {layers.cws && (
-            <Source
-              id="cws"
-              type="geojson"
-              data={`${BASE}data/cws_service_centroids.geojson`}
-            >
+            <Source id="cws" type="geojson" data={`${BASE}data/cws_service_centroids.geojson`}>
               <Layer
                 id="cws-points"
                 type="circle"
                 paint={{
-                  'circle-radius': [
-                    'interpolate',
-                    ['linear'],
-                    ['zoom'],
-                    3, 2,
-                    8, 4,
-                    12, 7,
-                  ],
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 2, 8, 4, 12, 7],
                   'circle-color': LAYER_COLORS.cws,
                   'circle-stroke-width': 0.5,
                   'circle-stroke-color': '#fff',
@@ -294,20 +402,36 @@ export default function App() {
             </Source>
           )}
 
+          {US_STATES.map(
+            (s) =>
+              stateLayers[s.code] && (
+                <Source
+                  key={s.code}
+                  id={`state-${s.code}`}
+                  type="geojson"
+                  data={`${BASE}data/states/cws_${s.code.toLowerCase()}.geojson`}
+                >
+                  <Layer
+                    id={`state-${s.code}-points`}
+                    type="circle"
+                    paint={{
+                      'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 6, 12, 9],
+                      'circle-color': LAYER_COLORS.state,
+                      'circle-stroke-width': 1,
+                      'circle-stroke-color': '#ecfeff',
+                      'circle-opacity': 0.9,
+                    }}
+                  />
+                </Source>
+              )
+          )}
 
           {layers.pa_pws && (
-            <Source
-              id="pa-pws"
-              type="geojson"
-              data={`${BASE}data/pa_pws_service_areas.geojson`}
-            >
+            <Source id="pa-pws" type="geojson" data={`${BASE}data/pa_pws_service_areas.geojson`}>
               <Layer
                 id="pa-pws-fill"
                 type="fill"
-                paint={{
-                  'fill-color': LAYER_COLORS.pa_pws,
-                  'fill-opacity': 0.25,
-                }}
+                paint={{ 'fill-color': LAYER_COLORS.pa_pws, 'fill-opacity': 0.25 }}
               />
               <Layer
                 id="pa-pws-outline"
@@ -322,23 +446,12 @@ export default function App() {
           )}
 
           {layers.wwtp && (
-            <Source
-              id="wwtp"
-              type="geojson"
-              data={`${BASE}data/wwtp_major.geojson`}
-            >
+            <Source id="wwtp" type="geojson" data={`${BASE}data/wwtp_major.geojson`}>
               <Layer
                 id="wwtp-points"
                 type="circle"
                 paint={{
-                  'circle-radius': [
-                    'interpolate',
-                    ['linear'],
-                    ['zoom'],
-                    3, 3,
-                    8, 6,
-                    12, 9,
-                  ],
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 6, 12, 9],
                   'circle-color': LAYER_COLORS.wwtp,
                   'circle-stroke-width': 1,
                   'circle-stroke-color': '#fff',
@@ -349,11 +462,7 @@ export default function App() {
           )}
 
           {layers.wwtp_pa && (
-            <Source
-              id="wwtp-pa"
-              type="geojson"
-              data={`${BASE}data/wwtp_pa.geojson`}
-            >
+            <Source id="wwtp-pa" type="geojson" data={`${BASE}data/wwtp_pa.geojson`}>
               <Layer
                 id="wwtp-pa-points"
                 type="circle"
@@ -368,23 +477,12 @@ export default function App() {
           )}
 
           {layers.dams && (
-            <Source
-              id="dams"
-              type="geojson"
-              data={`${BASE}data/nid_dams_full.geojson`}
-            >
+            <Source id="dams" type="geojson" data={`${BASE}data/nid_dams_full.geojson`}>
               <Layer
                 id="dams-points"
                 type="circle"
                 paint={{
-                  'circle-radius': [
-                    'interpolate',
-                    ['linear'],
-                    ['zoom'],
-                    3, 3,
-                    8, 5,
-                    12, 8,
-                  ],
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 2.5, 8, 5, 12, 8],
                   'circle-color': LAYER_COLORS.dams,
                   'circle-stroke-width': 1,
                   'circle-stroke-color': '#fff',
@@ -413,11 +511,7 @@ export default function App() {
           )}
 
           {layers.aqueducts && (
-            <Source
-              id="aqueducts"
-              type="geojson"
-              data={`${BASE}data/sample_aqueducts.geojson`}
-            >
+            <Source id="aqueducts" type="geojson" data={`${BASE}data/sample_aqueducts.geojson`}>
               <Layer
                 id="aqueducts-lines"
                 type="line"
@@ -462,34 +556,34 @@ export default function App() {
 
         <div className="legend">
           <div className="legend-title">Layers</div>
-          {layers.wwtp && (
+          {layers.cws && (
             <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.wwtp }} />
-              WWTP Majors (EPA)
+              <span className="legend-swatch" style={{ background: LAYER_COLORS.cws }} />
+              CWS (national)
             </div>
           )}
-          {layers.wwtp_pa && (
+          {enabledStateCount > 0 && (
             <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.wwtp_pa }} />
-              PA WWTP
+              <span className="legend-swatch" style={{ background: LAYER_COLORS.state }} />
+              State CWS ({enabledStateCount})
             </div>
           )}
           {layers.dams && (
             <div className="legend-item">
               <span className="legend-swatch" style={{ background: LAYER_COLORS.dams }} />
-              High-hazard dams
+              NID dams
+            </div>
+          )}
+          {layers.wwtp && (
+            <div className="legend-item">
+              <span className="legend-swatch" style={{ background: LAYER_COLORS.wwtp }} />
+              WWTP majors
             </div>
           )}
           {layers.pa_pws && (
             <div className="legend-item">
               <span className="legend-swatch" style={{ background: LAYER_COLORS.pa_pws }} />
-              PA service areas
-            </div>
-          )}
-          {layers.aqueducts && (
-            <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.aqueducts }} />
-              Aqueducts
+              PA polygons
             </div>
           )}
         </div>
