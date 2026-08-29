@@ -209,6 +209,11 @@ export default function App() {
   const [stateLayers, setStateLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(US_STATES.map((s) => [s.code, false]))
   );
+  // Per-state wastewater plants — default OFF
+  const [wwtpStateLayers, setWwtpStateLayers] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(US_STATES.map((s) => [s.code, false]))
+  );
+  const [showWwtpStates, setShowWwtpStates] = useState(false);
   const [popup, setPopup] = useState<PopupInfo | null>(null);
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [searchQ, setSearchQ] = useState('');
@@ -227,6 +232,10 @@ export default function App() {
 
   const toggleState = useCallback((code: string) => {
     setStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
+  }, []);
+
+  const toggleWwtpState = useCallback((code: string) => {
+    setWwtpStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
   }, []);
 
   const refreshLive = useCallback(async (stateCd: string) => {
@@ -316,13 +325,18 @@ export default function App() {
     if (layers.gauges) ids.push('gauge-points');
     for (const s of US_STATES) {
       if (stateLayers[s.code]) ids.push(`state-${s.code}-points`);
+      if (wwtpStateLayers[s.code]) ids.push(`wwtp-state-${s.code}-points`);
     }
     return ids;
-  }, [layers, stateLayers]);
+  }, [layers, stateLayers, wwtpStateLayers]);
 
   const enabledStateCount = useMemo(
     () => Object.values(stateLayers).filter(Boolean).length,
     [stateLayers]
+  );
+  const enabledWwtpStateCount = useMemo(
+    () => Object.values(wwtpStateLayers).filter(Boolean).length,
+    [wwtpStateLayers]
   );
 
   const refreshLabel = lastRefresh
@@ -530,7 +544,7 @@ export default function App() {
                 [
                   { id: 'cws' as CoreLayerId, label: 'CWS systems (national)', note: '~41k' },
                   { id: 'dams' as CoreLayerId, label: 'All NID dams', note: '92k' },
-                  { id: 'wwtp' as CoreLayerId, label: 'WWTP Majors', note: '2k' },
+                  { id: 'wwtp' as CoreLayerId, label: 'WWTP all states (EPA)', note: '~19k' },
                   { id: 'pa_pws' as CoreLayerId, label: 'PA service polygons', note: 'DEP' },
                   { id: 'wwtp_pa' as CoreLayerId, label: 'PA WWTP', note: '~974' },
                   { id: 'aqueducts' as CoreLayerId, label: 'Aqueducts', note: 'sample' },
@@ -633,6 +647,49 @@ export default function App() {
           </div>
 
           <div className="section">
+            <div className="section-title">
+              State WWTP (default OFF)
+              <button
+                type="button"
+                onClick={() => setShowWwtpStates((v) => !v)}
+                style={{
+                  marginLeft: 6,
+                  fontSize: 11,
+                  background: '#0f2744',
+                  border: '1px solid #1e3a5f',
+                  color: '#fb923c',
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                  cursor: 'pointer',
+                }}
+              >
+                {showWwtpStates ? 'Hide' : 'Show'} ({enabledWwtpStateCount} on)
+              </button>
+            </div>
+            {showWwtpStates && (
+              <div className="layer-list" style={{ maxHeight: 240, overflowY: 'auto' }}>
+                {US_STATES.map((s) => (
+                  <label key={`wwtp-${s.code}`} className="layer-item">
+                    <input
+                      type="checkbox"
+                      checked={!!wwtpStateLayers[s.code]}
+                      onChange={() => toggleWwtpState(s.code)}
+                    />
+                    <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
+                    <span className="layer-label">
+                      {s.name} WWTP ({s.code})
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="sources-note">
+              EPA FRS/ICIS wastewater treatment plants (~19k national). Enable state
+              layers or use the national WWTP layer above.
+            </p>
+          </div>
+
+          <div className="section">
             <div className="section-title">Costs (not live)</div>
             <div className="costs-panel">
               <div className="row">
@@ -730,7 +787,7 @@ export default function App() {
           )}
 
           {layers.wwtp && (
-            <Source id="wwtp" type="geojson" data={`${BASE}data/wwtp_major.geojson`}>
+            <Source id="wwtp" type="geojson" data={`${BASE}data/wwtp_all.geojson`}>
               <Layer
                 id="wwtp-points"
                 type="circle"
@@ -806,6 +863,30 @@ export default function App() {
                 }}
               />
             </Source>
+          )}
+
+          {US_STATES.map(
+            (s) =>
+              wwtpStateLayers[s.code] && (
+                <Source
+                  key={`wwtp-${s.code}`}
+                  id={`wwtp-state-${s.code}`}
+                  type="geojson"
+                  data={`${BASE}data/states/wwtp_${s.code.toLowerCase()}.geojson`}
+                >
+                  <Layer
+                    id={`wwtp-state-${s.code}-points`}
+                    type="circle"
+                    paint={{
+                      'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 6, 12, 9],
+                      'circle-color': LAYER_COLORS.wwtp,
+                      'circle-stroke-width': 1,
+                      'circle-stroke-color': '#fff',
+                      'circle-opacity': 0.9,
+                    }}
+                  />
+                </Source>
+              )
           )}
 
           {layers.gauges && gaugeGeo && (
