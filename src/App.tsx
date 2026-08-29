@@ -259,6 +259,10 @@ export default function App() {
     setCsoStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
   }, []);
 
+  const toggleWtpState = useCallback((code: string) => {
+    setWtpStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
+  }, []);
+
   const defaultLayers = useMemo(
     () =>
       ({
@@ -1017,6 +1021,31 @@ export default function App() {
           )}
 
           
+
+          {US_STATES.map(
+            (s) =>
+              wtpStateLayers[s.code] && (
+                <Source
+                  key={`wtp-${s.code}`}
+                  id={`wtp-state-${s.code}`}
+                  type="geojson"
+                  data={`${BASE}data/states/wtp_${s.code.toLowerCase()}.geojson`}
+                >
+                  <Layer
+                    id={`wtp-state-${s.code}-points`}
+                    type="circle"
+                    paint={{
+                      'circle-radius': 7,
+                      'circle-color': LAYER_COLORS.treatment,
+                      'circle-stroke-width': 1.5,
+                      'circle-stroke-color': '#fff',
+                      'circle-opacity': 0.95,
+                    }}
+                  />
+                </Source>
+              )
+          )}
+
           {layers.cso && (
             <Source id="cso" type="geojson" data={`${BASE}data/cso_outfalls.geojson`}>
               <Layer
