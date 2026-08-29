@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Boise Columbia WTP area", "state": "ID", "operator": "United Water / Suez area", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-116.25, 43.55]}}]}

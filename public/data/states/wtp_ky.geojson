@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Louisville Crescent Hill WTP", "state": "KY", "operator": "Louisville Water", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-85.68, 38.26]}}]}

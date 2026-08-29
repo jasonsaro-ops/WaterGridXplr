@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Burlington Water Treatment Plant", "state": "VT", "operator": "City of Burlington", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-73.25, 44.48]}}]}

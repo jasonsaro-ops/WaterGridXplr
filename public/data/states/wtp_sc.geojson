@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Charleston Hanahan WTP", "state": "SC", "operator": "Charleston Water System", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-80.0, 32.92]}}]}

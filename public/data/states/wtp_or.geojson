@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Bull Run headworks / Portland system", "state": "OR", "operator": "Portland Water Bureau", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-122.05, 45.45]}}]}

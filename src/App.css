@@ -512,3 +512,64 @@
 .state-nest .layer-item {
   padding-left: 0.25rem;
 }
+
+.state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+.state-nest {
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+  background: #0a1628;
+}
+.state-details {
+  border-bottom: 1px solid #1e3a5f;
+}
+.state-details:last-child {
+  border-bottom: none;
+}
+.state-details > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #e0f2fe;
+  user-select: none;
+}
+.state-details > summary::-webkit-details-marker {
+  display: none;
+}
+.state-details > summary:hover {
+  background: #0f2744;
+}
+.state-name {
+  font-weight: 600;
+}
+.state-code {
+  color: #64748b;
+  font-weight: 500;
+  margin-left: 0.25rem;
+}
+.state-badge {
+  font-size: 0.65rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: #1e293b;
+  color: #94a3b8;
+}
+.state-badge.on {
+  background: #0c4a6e;
+  color: #7dd3fc;
+}
+.state-body {
+  padding: 0.15rem 0.4rem 0.45rem 0.5rem;
+  background: #071018;
+}

@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Sioux Falls Water Purification Plant", "state": "SD", "operator": "City of Sioux Falls", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-96.75, 43.55]}}]}

@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Birmingham Western Filter Plant area", "state": "AL", "operator": "Birmingham Water Works", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-86.9, 33.5]}}]}

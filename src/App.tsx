@@ -201,19 +201,19 @@ export default function App() {
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(INITIAL_VIEW);
   const [layers, setLayers] = useState<Record<CoreLayerId, boolean>>({
-    wwtp: true,
+    wwtp: false,
     wwtp_pa: false,
-    treatment: true,
-    dams: true,
-    aqueducts: true,
+    treatment: false,
+    dams: false,
+    aqueducts: false,
     pa_pws: false,
-    cws: true,
+    cws: false,
     state: false,
-    gauges: true,
-    towers: true,
-    reservoirs: true,
-    desal: true,
-    cso: true,
+    gauges: false,
+    towers: false,
+    reservoirs: false,
+    desal: false,
+    cso: false,
     ms4: false,
   });
   const [stateLayers, setStateLayers] = useState<Record<string, boolean>>(() =>
@@ -226,7 +226,11 @@ export default function App() {
   const [csoStateLayers, setCsoStateLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(US_STATES.map((s) => [s.code, false]))
   );
+  const [wtpStateLayers, setWtpStateLayers] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(US_STATES.map((s) => [s.code, false]))
+  );
   const [showWwtpStates, setShowWwtpStates] = useState(false);
+  const [stateFilter, setStateFilter] = useState('');
   const [popup, setPopup] = useState<PopupInfo | null>(null);
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [searchQ, setSearchQ] = useState('');
@@ -258,19 +262,19 @@ export default function App() {
   const defaultLayers = useMemo(
     () =>
       ({
-        wwtp: true,
+        wwtp: false,
         wwtp_pa: false,
-        treatment: true,
-        dams: true,
-        aqueducts: true,
+        treatment: false,
+        dams: false,
+        aqueducts: false,
         pa_pws: false,
-        cws: true,
+        cws: false,
         state: false,
-        gauges: true,
-        towers: true,
-        reservoirs: true,
-        desal: true,
-        cso: true,
+        gauges: false,
+        towers: false,
+        reservoirs: false,
+        desal: false,
+        cso: false,
         ms4: false,
       }) as Record<CoreLayerId, boolean>,
     []
@@ -281,6 +285,7 @@ export default function App() {
     setStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
     setWwtpStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
     setCsoStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+    setWtpStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
   }, [defaultLayers]);
 
   const resetFilters = useCallback(() => {
@@ -401,9 +406,10 @@ export default function App() {
       if (stateLayers[s.code]) ids.push(`state-${s.code}-points`);
       if (wwtpStateLayers[s.code]) ids.push(`wwtp-state-${s.code}-points`);
       if (csoStateLayers[s.code]) ids.push(`cso-state-${s.code}-points`);
+      if (wtpStateLayers[s.code]) ids.push(`wtp-state-${s.code}-points`);
     }
     return ids;
-  }, [layers, stateLayers, wwtpStateLayers, csoStateLayers]);
+  }, [layers, stateLayers, wwtpStateLayers, csoStateLayers, wtpStateLayers]);
 
   const enabledStateCount = useMemo(
     () => Object.values(stateLayers).filter(Boolean).length,
@@ -447,11 +453,19 @@ export default function App() {
           <button type="button" className="tb-btn" onClick={refreshAll} title="Refresh live USGS data">
             Refresh
           </button>
-          <button type="button" className="tb-btn" onClick={resetLayers} title="Reset all layers to defaults">
-            Reset layers
+          <button type="button" className="tb-btn" onClick={resetLayers} title="Turn every layer off">
+            All layers off
+          </button>
+          <button
+            type="button"
+            className="tb-btn"
+            onClick={() => setLayers((p) => ({ ...p, gauges: false }))}
+            title="Turn stream gauges off"
+          >
+            Gauges off
           </button>
           <button type="button" className="tb-btn" onClick={resetFilters} title="Clear search and selection">
-            Reset filters
+            Clear filters
           </button>
           <button type="button" className="tb-btn" onClick={resetMapView} title="Reset map to full USA">
             Reset map
@@ -641,7 +655,7 @@ export default function App() {
                   { id: 'desal' as CoreLayerId, label: 'Desalination plants', note: 'US public list' },
                   { id: 'cso' as CoreLayerId, label: 'CSO outfalls (EPA ECHO)', note: '~6.7k' },
                   { id: 'ms4' as CoreLayerId, label: 'Urban areas (MS4-related)', note: 'Census 2020' },
-                  { id: 'treatment' as CoreLayerId, label: 'Drinking water treatment plants', note: 'major public' },
+                  { id: 'treatment' as CoreLayerId, label: 'Drinking WTP (national curated)', note: '~84 major' },
                 ] as const
               ).map((l) => (
                 <label key={l.id} className="layer-item">
@@ -659,92 +673,103 @@ export default function App() {
           </div>
 
           
+          
           <div className="section">
-            <div className="section-title">
-              States — CWS / WWTP / local (default OFF)
+            <div className="section-title">States</div>
+            <p className="sources-note" style={{ marginTop: 0 }}>
+              Enable infrastructure by state. All sublayers start off.
+            </p>
+            <div className="search-box" style={{ marginBottom: 8 }}>
+              <input
+                type="text"
+                placeholder="Filter states…"
+                value={stateFilter}
+                onChange={(e) => setStateFilter(e.target.value)}
+              />
+            </div>
+            <div className="state-actions">
+              <button type="button" className="tb-btn" onClick={() => setShowStates((v) => !v)}>
+                {showStates ? 'Collapse list' : 'Expand list'}
+              </button>
               <button
                 type="button"
-                onClick={() => setShowStates((v) => !v)}
-                style={{
-                  marginLeft: 6,
-                  fontSize: 11,
-                  background: '#0f2744',
-                  border: '1px solid #1e3a5f',
-                  color: '#7dd3fc',
-                  borderRadius: 4,
-                  padding: '2px 8px',
-                  cursor: 'pointer',
+                className="tb-btn"
+                onClick={() => {
+                  setStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+                  setWwtpStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+                  setCsoStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+                  setWtpStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+                  setLayers((p) => ({ ...p, pa_pws: false, wwtp_pa: false }));
                 }}
               >
-                {showStates ? 'Hide' : 'Show'} ({enabledStateCount + enabledWwtpStateCount + (layers.pa_pws || layers.wwtp_pa ? 1 : 0)} on)
+                All state layers off
               </button>
             </div>
             {showStates && (
-              <div className="state-nest" style={{ maxHeight: 320, overflowY: 'auto' }}>
-                {US_STATES.map((s) => (
-                  <div key={s.code} className="state-block" style={{ marginBottom: 8, padding: '6px 6px', background: '#0a1628', borderRadius: 6, border: '1px solid #1e3a5f' }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#e0f2fe', marginBottom: 4 }}>
-                      {s.name} ({s.code})
-                    </div>
-                    <label className="layer-item">
-                      <input
-                        type="checkbox"
-                        checked={!!stateLayers[s.code]}
-                        onChange={() => toggleState(s.code)}
-                      />
-                      <span className="layer-swatch" style={{ background: LAYER_COLORS.state }} />
-                      <span className="layer-label">CWS systems</span>
-                    </label>
-                    <label className="layer-item">
-                      <input
-                        type="checkbox"
-                        checked={!!wwtpStateLayers[s.code]}
-                        onChange={() => toggleWwtpState(s.code)}
-                      />
-                      <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
-                      <span className="layer-label">Wastewater plants</span>
-                    </label>
-                    <label className="layer-item">
-                      <input
-                        type="checkbox"
-                        checked={!!csoStateLayers[s.code]}
-                        onChange={() => toggleCsoState(s.code)}
-                      />
-                      <span className="layer-swatch" style={{ background: LAYER_COLORS.cso }} />
-                      <span className="layer-label">CSO outfalls (stormwater)</span>
-                    </label>
-                    {s.code === 'PA' && (
-                      <>
+              <div className="state-nest">
+                {US_STATES.filter(
+                  (s) =>
+                    !stateFilter.trim() ||
+                    s.name.toLowerCase().includes(stateFilter.toLowerCase()) ||
+                    s.code.toLowerCase().includes(stateFilter.toLowerCase())
+                ).map((s) => {
+                  const onCount =
+                    (stateLayers[s.code] ? 1 : 0) +
+                    (wwtpStateLayers[s.code] ? 1 : 0) +
+                    (csoStateLayers[s.code] ? 1 : 0) +
+                    (wtpStateLayers[s.code] ? 1 : 0) +
+                    (s.code === 'PA' && layers.pa_pws ? 1 : 0) +
+                    (s.code === 'PA' && layers.wwtp_pa ? 1 : 0);
+                  return (
+                    <details key={s.code} className="state-details">
+                      <summary>
+                        <span className="state-name">
+                          {s.name} <span className="state-code">{s.code}</span>
+                        </span>
+                        <span className={`state-badge${onCount ? ' on' : ''}`}>{onCount} on</span>
+                      </summary>
+                      <div className="state-body">
                         <label className="layer-item">
-                          <input
-                            type="checkbox"
-                            checked={layers.pa_pws}
-                            onChange={() => toggleLayer('pa_pws')}
-                          />
-                          <span className="layer-swatch" style={{ background: LAYER_COLORS.pa_pws }} />
-                          <span className="layer-label">PWS service area polygons (DEP)</span>
+                          <input type="checkbox" checked={!!stateLayers[s.code]} onChange={() => toggleState(s.code)} />
+                          <span className="layer-swatch" style={{ background: LAYER_COLORS.state }} />
+                          <span className="layer-label">Community water systems</span>
                         </label>
                         <label className="layer-item">
-                          <input
-                            type="checkbox"
-                            checked={layers.wwtp_pa}
-                            onChange={() => toggleLayer('wwtp_pa')}
-                          />
-                          <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp_pa }} />
-                          <span className="layer-label">PA WWTP (detailed filter)</span>
+                          <input type="checkbox" checked={!!wtpStateLayers[s.code]} onChange={() => toggleWtpState(s.code)} />
+                          <span className="layer-swatch" style={{ background: LAYER_COLORS.treatment }} />
+                          <span className="layer-label">Drinking water plants</span>
                         </label>
-                      </>
-                    )}
-                  </div>
-                ))}
+                        <label className="layer-item">
+                          <input type="checkbox" checked={!!wwtpStateLayers[s.code]} onChange={() => toggleWwtpState(s.code)} />
+                          <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
+                          <span className="layer-label">Wastewater plants</span>
+                        </label>
+                        <label className="layer-item">
+                          <input type="checkbox" checked={!!csoStateLayers[s.code]} onChange={() => toggleCsoState(s.code)} />
+                          <span className="layer-swatch" style={{ background: LAYER_COLORS.cso }} />
+                          <span className="layer-label">CSO outfalls</span>
+                        </label>
+                        {s.code === 'PA' && (
+                          <>
+                            <label className="layer-item">
+                              <input type="checkbox" checked={layers.pa_pws} onChange={() => toggleLayer('pa_pws')} />
+                              <span className="layer-swatch" style={{ background: LAYER_COLORS.pa_pws }} />
+                              <span className="layer-label">PWS service polygons (DEP)</span>
+                            </label>
+                            <label className="layer-item">
+                              <input type="checkbox" checked={layers.wwtp_pa} onChange={() => toggleLayer('wwtp_pa')} />
+                              <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp_pa }} />
+                              <span className="layer-label">PA WWTP filter</span>
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })}
               </div>
             )}
-            <p className="sources-note">
-              Each state nests CWS (EPA) and WWTP (EPA FRS/ICIS). Pennsylvania also includes
-              DEP service-area polygons under PA.
-            </p>
           </div>
-
 <div className="section">
             <div className="section-title">Costs (not live)</div>
             <div className="costs-panel">

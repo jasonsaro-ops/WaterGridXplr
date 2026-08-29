@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Salt Lake City Big Cottonwood WTP area", "state": "UT", "operator": "SLC Public Utilities", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-111.8, 40.65]}}]}

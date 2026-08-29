@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "Des Moines Fleur Drive WTP", "state": "IA", "operator": "Des Moines Water Works", "feature_kind": "Drinking water treatment plant", "source": "Public utility records (curated)"}, "geometry": {"type": "Point", "coordinates": [-93.65, 41.55]}}]}
