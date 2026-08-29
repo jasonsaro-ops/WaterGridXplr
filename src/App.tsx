@@ -1,10 +1,11 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Map, { NavigationControl, Source, Layer, Popup } from 'react-map-gl/maplibre';
 import type { MapRef, MapLayerMouseEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './App.css';
 
 const BASE = import.meta.env.BASE_URL;
+const REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
 const US_STATES: { code: string; name: string }[] = [
   { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' },
@@ -44,9 +45,10 @@ const LAYER_COLORS = {
   pa_pws: '#38bdf8',
   cws: '#14b8a6',
   state: '#2dd4bf',
+  gauges: '#facc15',
 } as const;
 
-type CoreLayerId = 'wwtp' | 'wwtp_pa' | 'treatment' | 'dams' | 'aqueducts' | 'pa_pws' | 'cws';
+type CoreLayerId = keyof typeof LAYER_COLORS;
 
 interface PopupInfo {
   longitude: number;
@@ -54,40 +56,36 @@ interface PopupInfo {
   properties: Record<string, unknown>;
 }
 
+interface LiveReading {
+  siteName: string;
+  siteCode: string;
+  parameter: string;
+  value: string;
+  unit: string;
+  time: string;
+}
+
+interface HistoryPoint {
+  time: string;
+  value: string;
+}
+
 const INITIAL_VIEW = { longitude: -98.5, latitude: 39.5, zoom: 3.6 };
 
 const LABEL_MAP: Record<string, string> = {
-  CWP_NAME: 'Name',
-  name: 'Name',
-  NAME: 'Name',
-  PWS_Name: 'System name',
-  PWSID: 'PWS ID',
-  Primacy_Agency: 'Primacy agency',
+  CWP_NAME: 'Name', name: 'Name', NAME: 'Name', PWS_Name: 'System name',
+  PWSID: 'PWS ID', Primacy_Agency: 'Primacy agency',
   Population_Served_Count: 'Population served',
   Service_Connections_Count: 'Service connections',
-  Service_Area_Type: 'Service area type',
-  Verification_Status: 'Verification',
-  Area_SqKM: 'Area (km²)',
-  nidId: 'NID ID',
-  state: 'State',
-  county: 'County',
-  city: 'City',
-  nidHeight: 'Height (ft)',
-  primaryPurposeId: 'Primary purpose',
-  ownerNames: 'Owner',
-  publicHazardId: 'Hazard class',
-  latitude: 'Latitude',
-  longitude: 'Longitude',
-  CNTY_NAME: 'County',
-  OWNERSHIP: 'Ownership',
-  GW_SOURCE: 'Groundwater source',
-  SW_SOURCE: 'Surface water source',
-  WUDS_ID: 'WUDS ID',
-  NPDES_ID: 'NPDES ID',
-  CWP_CITY: 'City',
-  CWP_STATE: 'State',
-  CWP_ZIP: 'ZIP',
-  CWP_COUNTY: 'County',
+  Service_Area_Type: 'Service area type', Verification_Status: 'Verification',
+  Area_SqKM: 'Area (km²)', nidId: 'NID ID', state: 'State', county: 'County',
+  city: 'City', nidHeight: 'Height (ft)', primaryPurposeId: 'Primary purpose',
+  ownerNames: 'Owner', publicHazardId: 'Hazard class',
+  latitude: 'Latitude', longitude: 'Longitude',
+  CNTY_NAME: 'County', OWNERSHIP: 'Ownership',
+  GW_SOURCE: 'Groundwater source', SW_SOURCE: 'Surface water source',
+  WUDS_ID: 'WUDS ID', NPDES_ID: 'NPDES ID',
+  CWP_CITY: 'City', CWP_STATE: 'State', CWP_ZIP: 'ZIP', CWP_COUNTY: 'County',
   CWP_FACILITY_TYPE_INDICATOR: 'Facility type',
   CWP_MAJOR_MINOR_STATUS: 'Major/Minor',
   CWP_PERMIT_STATUS_DESC: 'Permit status',
@@ -97,7 +95,7 @@ const LABEL_MAP: Record<string, string> = {
 function prettyProps(props: Record<string, unknown>): [string, string][] {
   const skip = new Set([
     'OBJECTID', 'OBJECTID_1', 'Shape__Area', 'Shape__Length',
-    'name', 'NAME', 'CWP_NAME', 'PWS_Name', // shown as title
+    'name', 'NAME', 'CWP_NAME', 'PWS_Name',
   ]);
   const rows: [string, string][] = [];
   for (const [k, v] of Object.entries(props)) {
@@ -106,6 +104,92 @@ function prettyProps(props: Record<string, unknown>): [string, string][] {
     rows.push([label, String(v)]);
   }
   return rows;
+}
+
+function featureTitle(props: Record<string, unknown>): string {
+  return String(
+    props.CWP_NAME || props.PWS_Name || props.name || props.NAME || 'Feature'
+  );
+}
+
+/** USGS near real-time IV for a state (streamflow 00060 + gage height 00065) */
+async function fetchUsgsStateLive(stateCd: string): Promise<{
+  readings: LiveReading[];
+  geojson: GeoJSON.FeatureCollection;
+}> {
+  const url =
+    `https://waterservices.usgs.gov/nwis/iv/?format=json` +
+    `&stateCd=${encodeURIComponent(stateCd.toLowerCase())}` +
+    `&parameterCd=00060,00065&siteStatus=active&siteType=ST`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`USGS ${res.status}`);
+  const data = await res.json();
+  const timeSeries = data?.value?.timeSeries || [];
+  const readings: LiveReading[] = [];
+  const features: GeoJSON.Feature[] = [];
+
+  for (const ts of timeSeries) {
+    const src = ts.sourceInfo || {};
+    const siteCode = src.siteCode?.[0]?.value || '';
+    const siteName = src.siteName || siteCode;
+    const geo = src.geoLocation?.geogLocation;
+    const lon = geo ? Number(geo.longitude) : NaN;
+    const lat = geo ? Number(geo.latitude) : NaN;
+    const param = ts.variable?.variableName || ts.variable?.variableCode?.[0]?.value || '';
+    const unit = ts.variable?.unit?.unitCode || '';
+    const values = ts.values?.[0]?.value || [];
+    const last = values[values.length - 1];
+    if (!last) continue;
+    readings.push({
+      siteName,
+      siteCode,
+      parameter: param,
+      value: String(last.value),
+      unit,
+      time: last.dateTime || '',
+    });
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+    features.push({
+      type: 'Feature',
+      properties: {
+        name: siteName,
+        siteCode,
+        parameter: param,
+        value: last.value,
+        unit,
+        time: last.dateTime,
+        state: stateCd,
+      },
+      geometry: { type: 'Point', coordinates: [lon, lat] },
+    });
+  }
+
+  return {
+    readings: readings.slice(0, 40),
+    geojson: { type: 'FeatureCollection', features },
+  };
+}
+
+/** Recent IV history for one site (last ~2 days of discharge) */
+async function fetchUsgsSiteHistory(siteCode: string): Promise<HistoryPoint[]> {
+  const end = new Date();
+  const start = new Date(end.getTime() - 2 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().slice(0, 19);
+  const url =
+    `https://waterservices.usgs.gov/nwis/iv/?format=json` +
+    `&sites=${encodeURIComponent(siteCode)}` +
+    `&parameterCd=00060&startDT=${fmt(start)}&endDT=${fmt(end)}`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const values = data?.value?.timeSeries?.[0]?.values?.[0]?.value || [];
+  // downsample to ~24 points
+  const step = Math.max(1, Math.floor(values.length / 24));
+  const pts: HistoryPoint[] = [];
+  for (let i = 0; i < values.length; i += step) {
+    pts.push({ time: values[i].dateTime, value: String(values[i].value) });
+  }
+  return pts;
 }
 
 export default function App() {
@@ -119,15 +203,23 @@ export default function App() {
     aqueducts: false,
     pa_pws: true,
     cws: true,
+    state: false,
+    gauges: true,
   });
-  // All state layers OFF by default
   const [stateLayers, setStateLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(US_STATES.map((s) => [s.code, false]))
   );
   const [popup, setPopup] = useState<PopupInfo | null>(null);
+  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [searchQ, setSearchQ] = useState('');
-  const [status] = useState('Public GIS · NID · EPA CWS · PA DEP');
   const [showStates, setShowStates] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [liveReadings, setLiveReadings] = useState<LiveReading[]>([]);
+  const [gaugeGeo, setGaugeGeo] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveState, setLiveState] = useState('PA');
+  const [tick, setTick] = useState(0);
 
   const toggleLayer = useCallback((id: CoreLayerId) => {
     setLayers((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -137,17 +229,55 @@ export default function App() {
     setStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
   }, []);
 
-  const onMapClick = useCallback((e: MapLayerMouseEvent) => {
+  const refreshLive = useCallback(async (stateCd: string) => {
+    setLiveLoading(true);
+    try {
+      const { readings, geojson } = await fetchUsgsStateLive(stateCd);
+      setLiveReadings(readings);
+      setGaugeGeo(geojson);
+      setLastRefresh(new Date());
+    } catch (e) {
+      console.warn('USGS live fetch failed', e);
+    } finally {
+      setLiveLoading(false);
+    }
+  }, []);
+
+  // Initial + every 5 minutes
+  useEffect(() => {
+    refreshLive(liveState);
+    const id = window.setInterval(() => {
+      setTick((t) => t + 1);
+      refreshLive(liveState);
+    }, REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [liveState, refreshLive]);
+
+  const onMapClick = useCallback(async (e: MapLayerMouseEvent) => {
     const feat = e.features?.[0];
     if (!feat?.properties) {
       setPopup(null);
       return;
     }
+    const props = feat.properties as Record<string, unknown>;
     setPopup({
       longitude: e.lngLat.lng,
       latitude: e.lngLat.lat,
-      properties: feat.properties as Record<string, unknown>,
+      properties: props,
     });
+    setSelected(props);
+    setHistory([]);
+
+    // If USGS gauge, load history
+    const siteCode = String(props.siteCode || '');
+    if (siteCode) {
+      try {
+        const pts = await fetchUsgsSiteHistory(siteCode);
+        setHistory(pts);
+      } catch {
+        /* ignore */
+      }
+    }
   }, []);
 
   const doSearch = useCallback(async () => {
@@ -183,6 +313,7 @@ export default function App() {
     if (layers.dams) ids.push('dams-points');
     if (layers.aqueducts) ids.push('aqueducts-lines');
     if (layers.pa_pws) ids.push('pa-pws-fill', 'pa-pws-outline');
+    if (layers.gauges) ids.push('gauge-points');
     for (const s of US_STATES) {
       if (stateLayers[s.code]) ids.push(`state-${s.code}-points`);
     }
@@ -193,6 +324,12 @@ export default function App() {
     () => Object.values(stateLayers).filter(Boolean).length,
     [stateLayers]
   );
+
+  const refreshLabel = lastRefresh
+    ? `Live USGS · ${lastRefresh.toLocaleTimeString()} · every 5 min`
+    : liveLoading
+      ? 'Loading USGS live…'
+      : 'USGS live pending';
 
   return (
     <div className="app">
@@ -218,11 +355,92 @@ export default function App() {
         </div>
 
         <div className="sidebar-body">
+          {/* Selected feature detail — high contrast white panel */}
+          {selected && (
+            <div className="section">
+              <div className="section-title">Selected feature</div>
+              <div className="detail-panel">
+                <h3>{featureTitle(selected)}</h3>
+                {prettyProps(selected).map(([k, v]) => (
+                  <div key={k} className="meta-row">
+                    <span className="meta-key">{k}</span>
+                    <span className="meta-val">{v}</span>
+                  </div>
+                ))}
+                <div className="detail-actions">
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => {
+                      setSelected(null);
+                      setHistory([]);
+                      setPopup(null);
+                    }}
+                  >
+                    Clear
+                  </button>
+                  {selected.siteCode && (
+                    <a
+                      className="btn-primary"
+                      href={`https://waterdata.usgs.gov/monitoring-location/${selected.siteCode}/`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      USGS site page
+                    </a>
+                  )}
+                  {selected.PWSID && (
+                    <a
+                      className="btn-primary"
+                      href={`https://sdwis.epa.gov/ords/sfdw_pub/r/sfdw/sdwis_fed_reports_public/200?P200_PWSID=${selected.PWSID}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      EPA SDWIS
+                    </a>
+                  )}
+                  {selected.nidId && (
+                    <a
+                      className="btn-primary"
+                      href="https://nid.sec.usace.army.mil/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      NID portal
+                    </a>
+                  )}
+                </div>
+
+                {(history.length > 0 || selected.siteCode) && (
+                  <div className="live-box">
+                    <h4>Near real-time / recent history</h4>
+                    {history.length === 0 ? (
+                      <div>Loading recent discharge…</div>
+                    ) : (
+                      <ul className="history-list">
+                        {history.map((h, i) => (
+                          <li key={i}>
+                            <span>{new Date(h.time).toLocaleString()}</span>
+                            <strong>{h.value} cfs</strong>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p style={{ margin: '0.4rem 0 0', fontSize: '0.68rem', color: '#64748b' }}>
+                      USGS Instantaneous Values (provisional). Water utility rates are not
+                      published as a live national feed — see local tariffs / PUC.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="section">
-            <div className="section-title">National Snapshot</div>
+            <div className="section-title">National snapshot</div>
             <div className="kpi-grid">
               <div className="kpi">
-                <div className="kpi-label">Total withdrawals</div>
+                <div className="kpi-label">Withdrawals</div>
                 <div className="kpi-value">
                   ~322 <span className="kpi-unit">BGD</span>
                 </div>
@@ -234,7 +452,7 @@ export default function App() {
                 </div>
               </div>
               <div className="kpi">
-                <div className="kpi-label">Avg residential</div>
+                <div className="kpi-label">Avg rate</div>
                 <div className="kpi-value">
                   ~$5.15 <span className="kpi-unit">/1k gal</span>
                 </div>
@@ -242,18 +460,22 @@ export default function App() {
               <div className="kpi">
                 <div className="kpi-label">NID dams</div>
                 <div className="kpi-value">
-                  92,766 <span className="kpi-unit">loaded</span>
+                  92.8k <span className="kpi-unit">pts</span>
                 </div>
               </div>
             </div>
+            <p className="refresh-hint">
+              Live gauges refresh every 5 minutes (USGS IV). Infrastructure inventories
+              update less often (EPA / NID). Tick #{tick}.
+            </p>
           </div>
 
           <div className="section">
-            <div className="section-title">Search location</div>
+            <div className="section-title">Search</div>
             <div className="search-box">
               <input
                 type="text"
-                placeholder="City, ZIP, or landmark…"
+                placeholder="City, ZIP, landmark…"
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && doSearch()}
@@ -265,16 +487,53 @@ export default function App() {
           </div>
 
           <div className="section">
+            <div className="section-title">Live USGS gauges (state)</div>
+            <div className="search-box">
+              <select
+                value={liveState}
+                onChange={(e) => setLiveState(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: '#0f2744',
+                  border: '1px solid #1e3a5f',
+                  borderRadius: 6,
+                  color: '#e0f2fe',
+                  padding: '0.4rem',
+                }}
+              >
+                {US_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={() => refreshLive(liveState)} disabled={liveLoading}>
+                {liveLoading ? '…' : 'Refresh'}
+              </button>
+            </div>
+            <label className="layer-item" style={{ marginTop: 6 }}>
+              <input
+                type="checkbox"
+                checked={layers.gauges}
+                onChange={() => toggleLayer('gauges')}
+              />
+              <span className="layer-swatch" style={{ background: LAYER_COLORS.gauges }} />
+              <span className="layer-label">Show gauges on map</span>
+              <span className="layer-count">{liveReadings.length} series</span>
+            </label>
+          </div>
+
+          <div className="section">
             <div className="section-title">National layers</div>
             <div className="layer-list">
               {(
                 [
-                  { id: 'cws' as CoreLayerId, label: 'CWS systems (all states)', note: '~41k EPA' },
-                  { id: 'dams' as CoreLayerId, label: 'All NID dams', note: '92,766' },
-                  { id: 'wwtp' as CoreLayerId, label: 'WWTP Majors (EPA)', note: '2,000' },
-                  { id: 'pa_pws' as CoreLayerId, label: 'PA service area polygons', note: 'DEP' },
-                  { id: 'wwtp_pa' as CoreLayerId, label: 'PA wastewater plants', note: '~974' },
-                  { id: 'aqueducts' as CoreLayerId, label: 'Major aqueducts', note: 'sample' },
+                  { id: 'cws' as CoreLayerId, label: 'CWS systems (national)', note: '~41k' },
+                  { id: 'dams' as CoreLayerId, label: 'All NID dams', note: '92k' },
+                  { id: 'wwtp' as CoreLayerId, label: 'WWTP Majors', note: '2k' },
+                  { id: 'pa_pws' as CoreLayerId, label: 'PA service polygons', note: 'DEP' },
+                  { id: 'wwtp_pa' as CoreLayerId, label: 'PA WWTP', note: '~974' },
+                  { id: 'aqueducts' as CoreLayerId, label: 'Aqueducts', note: 'sample' },
                   { id: 'treatment' as CoreLayerId, label: 'Drinking WTP samples', note: 'demo' },
                 ] as const
               ).map((l) => (
@@ -294,13 +553,12 @@ export default function App() {
 
           <div className="section">
             <div className="section-title">
-              State CWS layers (default OFF)
+              State CWS (default OFF)
               <button
                 type="button"
-                className="section-toggle"
                 onClick={() => setShowStates((v) => !v)}
                 style={{
-                  marginLeft: 8,
+                  marginLeft: 6,
                   fontSize: 11,
                   background: '#0f2744',
                   border: '1px solid #1e3a5f',
@@ -314,7 +572,7 @@ export default function App() {
               </button>
             </div>
             {showStates && (
-              <div className="layer-list" style={{ maxHeight: 280, overflowY: 'auto' }}>
+              <div className="layer-list" style={{ maxHeight: 240, overflowY: 'auto' }}>
                 {US_STATES.map((s) => (
                   <label key={s.code} className="layer-item">
                     <input
@@ -322,10 +580,7 @@ export default function App() {
                       checked={!!stateLayers[s.code]}
                       onChange={() => toggleState(s.code)}
                     />
-                    <span
-                      className="layer-swatch"
-                      style={{ background: LAYER_COLORS.state }}
-                    />
+                    <span className="layer-swatch" style={{ background: LAYER_COLORS.state }} />
                     <span className="layer-label">
                       {s.name} ({s.code})
                     </span>
@@ -333,43 +588,72 @@ export default function App() {
                 ))}
               </div>
             )}
-            <p className="sources-note">
-              Per-state layers use EPA Community Water System records (PWSID, name,
-              population served, connections, area). PA also has DEP service-area
-              polygons. Enable only the states you need.
-            </p>
           </div>
 
           <div className="section">
-            <div className="section-title">Water costs & usage</div>
+            <div className="section-title">Legend</div>
+            <div className="layer-list">
+              {layers.cws && (
+                <div className="layer-item">
+                  <span className="layer-swatch" style={{ background: LAYER_COLORS.cws }} />
+                  <span className="layer-label">CWS national</span>
+                </div>
+              )}
+              {layers.dams && (
+                <div className="layer-item">
+                  <span className="layer-swatch" style={{ background: LAYER_COLORS.dams }} />
+                  <span className="layer-label">NID dams</span>
+                </div>
+              )}
+              {layers.wwtp && (
+                <div className="layer-item">
+                  <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
+                  <span className="layer-label">WWTP majors</span>
+                </div>
+              )}
+              {layers.gauges && (
+                <div className="layer-item">
+                  <span className="layer-swatch" style={{ background: LAYER_COLORS.gauges }} />
+                  <span className="layer-label">USGS gauges</span>
+                </div>
+              )}
+              {layers.pa_pws && (
+                <div className="layer-item">
+                  <span className="layer-swatch" style={{ background: LAYER_COLORS.pa_pws }} />
+                  <span className="layer-label">PA polygons</span>
+                </div>
+              )}
+              {enabledStateCount > 0 && (
+                <div className="layer-item">
+                  <span className="layer-swatch" style={{ background: LAYER_COLORS.state }} />
+                  <span className="layer-label">State CWS ({enabledStateCount})</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="section">
+            <div className="section-title">Costs (not live)</div>
             <div className="costs-panel">
               <div className="row">
-                <span>National avg (approx)</span>
+                <span>National avg</span>
                 <span>$3.85 / CCF</span>
               </div>
               <div className="row">
-                <span>≈ per 1,000 gallons</span>
+                <span>≈ per 1,000 gal</span>
                 <span>$5.15</span>
               </div>
-              <div className="row">
-                <span>Irrigation (USGS)</span>
-                <span>~118 BGD</span>
-              </div>
-              <div className="row">
-                <span>Thermoelectric</span>
-                <span>~133 BGD</span>
-              </div>
               <p className="note">
-                Click map features for system/dam metadata. Retail rates are in
-                utility tariffs and state PUC filings.
+                Utility rates are not available as a national real-time API. Click a
+                feature for inventory metadata and USGS stream history where available.
               </p>
             </div>
           </div>
         </div>
 
         <div className="status-bar">
-          <span className="status-dot" />
-          {status}
+          <span className={`status-dot${lastRefresh ? '' : ' stale'}`} />
+          {refreshLabel}
         </div>
       </aside>
 
@@ -524,6 +808,21 @@ export default function App() {
             </Source>
           )}
 
+          {layers.gauges && gaugeGeo && (
+            <Source id="gauges" type="geojson" data={gaugeGeo}>
+              <Layer
+                id="gauge-points"
+                type="circle"
+                paint={{
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 6, 12, 9],
+                  'circle-color': LAYER_COLORS.gauges,
+                  'circle-stroke-width': 1.2,
+                  'circle-stroke-color': '#422006',
+                }}
+              />
+            </Source>
+          )}
+
           {popup && (
             <Popup
               longitude={popup.longitude}
@@ -531,59 +830,48 @@ export default function App() {
               anchor="bottom"
               onClose={() => setPopup(null)}
               closeOnClick={false}
-              maxWidth="320px"
+              maxWidth="300px"
             >
               <div className="water-popup">
-                <h3>
-                  {String(
-                    popup.properties.CWP_NAME ||
-                      popup.properties.PWS_Name ||
-                      popup.properties.name ||
-                      popup.properties.NAME ||
-                      'Feature'
-                  )}
-                </h3>
-                {prettyProps(popup.properties).map(([k, v]) => (
-                  <div key={k} className="meta-row">
-                    <span className="meta-key">{k}</span>
-                    <span className="meta-val">{v}</span>
-                  </div>
-                ))}
+                <h3>{featureTitle(popup.properties)}</h3>
+                {prettyProps(popup.properties)
+                  .slice(0, 6)
+                  .map(([k, v]) => (
+                    <div key={k} className="meta-row">
+                      <span className="meta-key">{k}</span>
+                      <span className="meta-val">{v}</span>
+                    </div>
+                  ))}
+                <div className="hint">Full metadata → left panel</div>
               </div>
             </Popup>
           )}
         </Map>
 
-        <div className="legend">
-          <div className="legend-title">Layers</div>
+        <div className="map-legend">
+          <div className="map-legend-title">Active</div>
           {layers.cws && (
-            <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.cws }} />
-              CWS (national)
-            </div>
-          )}
-          {enabledStateCount > 0 && (
-            <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.state }} />
-              State CWS ({enabledStateCount})
+            <div className="map-legend-item">
+              <span className="map-legend-swatch" style={{ background: LAYER_COLORS.cws }} />
+              CWS
             </div>
           )}
           {layers.dams && (
-            <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.dams }} />
-              NID dams
+            <div className="map-legend-item">
+              <span className="map-legend-swatch" style={{ background: LAYER_COLORS.dams }} />
+              Dams
             </div>
           )}
           {layers.wwtp && (
-            <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.wwtp }} />
-              WWTP majors
+            <div className="map-legend-item">
+              <span className="map-legend-swatch" style={{ background: LAYER_COLORS.wwtp }} />
+              WWTP
             </div>
           )}
-          {layers.pa_pws && (
-            <div className="legend-item">
-              <span className="legend-swatch" style={{ background: LAYER_COLORS.pa_pws }} />
-              PA polygons
+          {layers.gauges && (
+            <div className="map-legend-item">
+              <span className="map-legend-swatch" style={{ background: LAYER_COLORS.gauges }} />
+              Gauges
             </div>
           )}
         </div>
