@@ -49,6 +49,8 @@ const LAYER_COLORS = {
   towers: '#f472b6',
   reservoirs: '#60a5fa',
   desal: '#a3e635',
+  cso: '#e11d48',
+  ms4: '#94a3b8',
 } as const;
 
 type CoreLayerId = keyof typeof LAYER_COLORS;
@@ -211,12 +213,17 @@ export default function App() {
     towers: true,
     reservoirs: true,
     desal: true,
+    cso: true,
+    ms4: false,
   });
   const [stateLayers, setStateLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(US_STATES.map((s) => [s.code, false]))
   );
   // Per-state wastewater plants — default OFF
   const [wwtpStateLayers, setWwtpStateLayers] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(US_STATES.map((s) => [s.code, false]))
+  );
+  const [csoStateLayers, setCsoStateLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(US_STATES.map((s) => [s.code, false]))
   );
   const [showWwtpStates, setShowWwtpStates] = useState(false);
@@ -244,6 +251,10 @@ export default function App() {
     setWwtpStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
   }, []);
 
+  const toggleCsoState = useCallback((code: string) => {
+    setCsoStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
+  }, []);
+
   const defaultLayers = useMemo(
     () =>
       ({
@@ -259,6 +270,8 @@ export default function App() {
         towers: true,
         reservoirs: true,
         desal: true,
+        cso: true,
+        ms4: false,
       }) as Record<CoreLayerId, boolean>,
     []
   );
@@ -267,6 +280,7 @@ export default function App() {
     setLayers({ ...defaultLayers });
     setStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
     setWwtpStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+    setCsoStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
   }, [defaultLayers]);
 
   const resetFilters = useCallback(() => {
@@ -380,13 +394,16 @@ export default function App() {
     if (layers.towers) ids.push('towers-points');
     if (layers.reservoirs) ids.push('reservoirs-points');
     if (layers.desal) ids.push('desal-points');
+    if (layers.cso) ids.push('cso-points');
+    if (layers.ms4) ids.push('ms4-fill');
     if (layers.aqueducts) ids.push('aqueducts-major-lines');
     for (const s of US_STATES) {
       if (stateLayers[s.code]) ids.push(`state-${s.code}-points`);
       if (wwtpStateLayers[s.code]) ids.push(`wwtp-state-${s.code}-points`);
+      if (csoStateLayers[s.code]) ids.push(`cso-state-${s.code}-points`);
     }
     return ids;
-  }, [layers, stateLayers, wwtpStateLayers]);
+  }, [layers, stateLayers, wwtpStateLayers, csoStateLayers]);
 
   const enabledStateCount = useMemo(
     () => Object.values(stateLayers).filter(Boolean).length,
@@ -622,6 +639,8 @@ export default function App() {
                   { id: 'aqueducts' as CoreLayerId, label: 'Major aqueducts / canals', note: 'national' },
                   { id: 'towers' as CoreLayerId, label: 'Water towers (OSM when avail.)', note: 'OSM' },
                   { id: 'desal' as CoreLayerId, label: 'Desalination plants', note: 'US public list' },
+                  { id: 'cso' as CoreLayerId, label: 'CSO outfalls (EPA ECHO)', note: '~6.7k' },
+                  { id: 'ms4' as CoreLayerId, label: 'Urban areas (MS4-related)', note: 'Census 2020' },
                   { id: 'treatment' as CoreLayerId, label: 'Drinking water treatment plants', note: 'major public' },
                 ] as const
               ).map((l) => (
@@ -684,6 +703,15 @@ export default function App() {
                       />
                       <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
                       <span className="layer-label">Wastewater plants</span>
+                    </label>
+                    <label className="layer-item">
+                      <input
+                        type="checkbox"
+                        checked={!!csoStateLayers[s.code]}
+                        onChange={() => toggleCsoState(s.code)}
+                      />
+                      <span className="layer-swatch" style={{ background: LAYER_COLORS.cso }} />
+                      <span className="layer-label">CSO outfalls (stormwater)</span>
                     </label>
                     {s.code === 'PA' && (
                       <>
@@ -957,6 +985,62 @@ export default function App() {
                       'circle-stroke-width': 1,
                       'circle-stroke-color': '#fff',
                       'circle-opacity': 0.9,
+                    }}
+                  />
+                </Source>
+              )
+          )}
+
+          
+          {layers.cso && (
+            <Source id="cso" type="geojson" data={`${BASE}data/cso_outfalls.geojson`}>
+              <Layer
+                id="cso-points"
+                type="circle"
+                paint={{
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 2.5, 8, 5, 12, 8],
+                  'circle-color': LAYER_COLORS.cso,
+                  'circle-stroke-width': 1,
+                  'circle-stroke-color': '#fff',
+                  'circle-opacity': 0.9,
+                }}
+              />
+            </Source>
+          )}
+
+          {layers.ms4 && (
+            <Source id="ms4" type="geojson" data={`${BASE}data/ms4_urban_areas.geojson`}>
+              <Layer
+                id="ms4-fill"
+                type="fill"
+                paint={{ 'fill-color': LAYER_COLORS.ms4, 'fill-opacity': 0.18 }}
+              />
+              <Layer
+                id="ms4-outline"
+                type="line"
+                paint={{ 'line-color': LAYER_COLORS.ms4, 'line-width': 0.8, 'line-opacity': 0.5 }}
+              />
+            </Source>
+          )}
+
+          {US_STATES.map(
+            (s) =>
+              csoStateLayers[s.code] && (
+                <Source
+                  key={`cso-${s.code}`}
+                  id={`cso-state-${s.code}`}
+                  type="geojson"
+                  data={`${BASE}data/states/cso_${s.code.toLowerCase()}.geojson`}
+                >
+                  <Layer
+                    id={`cso-state-${s.code}-points`}
+                    type="circle"
+                    paint={{
+                      'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 6, 12, 9],
+                      'circle-color': LAYER_COLORS.cso,
+                      'circle-stroke-width': 1,
+                      'circle-stroke-color': '#fecdd3',
+                      'circle-opacity': 0.95,
                     }}
                   />
                 </Source>
