@@ -201,10 +201,10 @@ export default function App() {
   const [layers, setLayers] = useState<Record<CoreLayerId, boolean>>({
     wwtp: true,
     wwtp_pa: false,
-    treatment: false,
+    treatment: true,
     dams: true,
     aqueducts: true,
-    pa_pws: true,
+    pa_pws: false,
     cws: true,
     state: false,
     gauges: true,
@@ -244,6 +244,49 @@ export default function App() {
     setWwtpStateLayers((prev) => ({ ...prev, [code]: !prev[code] }));
   }, []);
 
+  const defaultLayers = useMemo(
+    () =>
+      ({
+        wwtp: true,
+        wwtp_pa: false,
+        treatment: true,
+        dams: true,
+        aqueducts: true,
+        pa_pws: false,
+        cws: true,
+        state: false,
+        gauges: true,
+        towers: true,
+        reservoirs: true,
+        desal: true,
+      }) as Record<CoreLayerId, boolean>,
+    []
+  );
+
+  const resetLayers = useCallback(() => {
+    setLayers({ ...defaultLayers });
+    setStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+    setWwtpStateLayers(Object.fromEntries(US_STATES.map((s) => [s.code, false])));
+  }, [defaultLayers]);
+
+  const resetFilters = useCallback(() => {
+    setSearchQ('');
+    setSelected(null);
+    setPopup(null);
+    setHistory([]);
+    setShowStates(false);
+    setShowWwtpStates(false);
+  }, []);
+
+  const resetMapView = useCallback(() => {
+    mapRef.current?.flyTo({
+      center: [INITIAL_VIEW.longitude, INITIAL_VIEW.latitude],
+      zoom: INITIAL_VIEW.zoom,
+      duration: 1200,
+    });
+    setViewState({ ...INITIAL_VIEW });
+  }, []);
+
   const refreshLive = useCallback(async (stateCd: string) => {
     setLiveLoading(true);
     try {
@@ -257,6 +300,11 @@ export default function App() {
       setLiveLoading(false);
     }
   }, []);
+
+  const refreshAll = useCallback(() => {
+    refreshLive(liveState);
+    setTick((t) => t + 1);
+  }, [liveState, refreshLive]);
 
   // Initial + every 5 minutes
   useEffect(() => {
@@ -376,6 +424,21 @@ export default function App() {
             <h1>WaterGridXplr</h1>
             <div className="subtitle">US Water Infrastructure Explorer</div>
           </div>
+        </div>
+
+        <div className="toolbar">
+          <button type="button" className="tb-btn" onClick={refreshAll} title="Refresh live USGS data">
+            Refresh
+          </button>
+          <button type="button" className="tb-btn" onClick={resetLayers} title="Reset all layers to defaults">
+            Reset layers
+          </button>
+          <button type="button" className="tb-btn" onClick={resetFilters} title="Clear search and selection">
+            Reset filters
+          </button>
+          <button type="button" className="tb-btn" onClick={resetMapView} title="Reset map to full USA">
+            Reset map
+          </button>
         </div>
 
         <div className="sidebar-body">
@@ -555,13 +618,11 @@ export default function App() {
                   { id: 'cws' as CoreLayerId, label: 'CWS systems (national)', note: '~41k' },
                   { id: 'dams' as CoreLayerId, label: 'All NID dams', note: '92k' },
                   { id: 'wwtp' as CoreLayerId, label: 'WWTP all states (EPA)', note: '~19k' },
-                  { id: 'pa_pws' as CoreLayerId, label: 'PA service polygons', note: 'DEP' },
-                  { id: 'wwtp_pa' as CoreLayerId, label: 'PA WWTP', note: '~974' },
                   { id: 'reservoirs' as CoreLayerId, label: 'Major reservoirs (NID ≥50ft)', note: '~6.8k' },
                   { id: 'aqueducts' as CoreLayerId, label: 'Major aqueducts / canals', note: 'national' },
                   { id: 'towers' as CoreLayerId, label: 'Water towers (OSM when avail.)', note: 'OSM' },
-                  { id: 'desal' as CoreLayerId, label: 'Desalination plants', note: 'major' },
-                  { id: 'treatment' as CoreLayerId, label: 'Drinking WTP samples', note: 'demo' },
+                  { id: 'desal' as CoreLayerId, label: 'Desalination plants', note: 'US public list' },
+                  { id: 'treatment' as CoreLayerId, label: 'Drinking water treatment plants', note: 'major public' },
                 ] as const
               ).map((l) => (
                 <label key={l.id} className="layer-item">
@@ -578,9 +639,10 @@ export default function App() {
             </div>
           </div>
 
+          
           <div className="section">
             <div className="section-title">
-              State CWS (default OFF)
+              States — CWS / WWTP / local (default OFF)
               <button
                 type="button"
                 onClick={() => setShowStates((v) => !v)}
@@ -595,114 +657,67 @@ export default function App() {
                   cursor: 'pointer',
                 }}
               >
-                {showStates ? 'Hide' : 'Show'} ({enabledStateCount} on)
+                {showStates ? 'Hide' : 'Show'} ({enabledStateCount + enabledWwtpStateCount + (layers.pa_pws || layers.wwtp_pa ? 1 : 0)} on)
               </button>
             </div>
             {showStates && (
-              <div className="layer-list" style={{ maxHeight: 240, overflowY: 'auto' }}>
+              <div className="state-nest" style={{ maxHeight: 320, overflowY: 'auto' }}>
                 {US_STATES.map((s) => (
-                  <label key={s.code} className="layer-item">
-                    <input
-                      type="checkbox"
-                      checked={!!stateLayers[s.code]}
-                      onChange={() => toggleState(s.code)}
-                    />
-                    <span className="layer-swatch" style={{ background: LAYER_COLORS.state }} />
-                    <span className="layer-label">
+                  <div key={s.code} className="state-block" style={{ marginBottom: 8, padding: '6px 6px', background: '#0a1628', borderRadius: 6, border: '1px solid #1e3a5f' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#e0f2fe', marginBottom: 4 }}>
                       {s.name} ({s.code})
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="section">
-            <div className="section-title">Legend</div>
-            <div className="layer-list">
-              {layers.cws && (
-                <div className="layer-item">
-                  <span className="layer-swatch" style={{ background: LAYER_COLORS.cws }} />
-                  <span className="layer-label">CWS national</span>
-                </div>
-              )}
-              {layers.dams && (
-                <div className="layer-item">
-                  <span className="layer-swatch" style={{ background: LAYER_COLORS.dams }} />
-                  <span className="layer-label">NID dams</span>
-                </div>
-              )}
-              {layers.wwtp && (
-                <div className="layer-item">
-                  <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
-                  <span className="layer-label">WWTP majors</span>
-                </div>
-              )}
-              {layers.gauges && (
-                <div className="layer-item">
-                  <span className="layer-swatch" style={{ background: LAYER_COLORS.gauges }} />
-                  <span className="layer-label">USGS gauges</span>
-                </div>
-              )}
-              {layers.pa_pws && (
-                <div className="layer-item">
-                  <span className="layer-swatch" style={{ background: LAYER_COLORS.pa_pws }} />
-                  <span className="layer-label">PA polygons</span>
-                </div>
-              )}
-              {enabledStateCount > 0 && (
-                <div className="layer-item">
-                  <span className="layer-swatch" style={{ background: LAYER_COLORS.state }} />
-                  <span className="layer-label">State CWS ({enabledStateCount})</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="section">
-            <div className="section-title">
-              State WWTP (default OFF)
-              <button
-                type="button"
-                onClick={() => setShowWwtpStates((v) => !v)}
-                style={{
-                  marginLeft: 6,
-                  fontSize: 11,
-                  background: '#0f2744',
-                  border: '1px solid #1e3a5f',
-                  color: '#fb923c',
-                  borderRadius: 4,
-                  padding: '2px 8px',
-                  cursor: 'pointer',
-                }}
-              >
-                {showWwtpStates ? 'Hide' : 'Show'} ({enabledWwtpStateCount} on)
-              </button>
-            </div>
-            {showWwtpStates && (
-              <div className="layer-list" style={{ maxHeight: 240, overflowY: 'auto' }}>
-                {US_STATES.map((s) => (
-                  <label key={`wwtp-${s.code}`} className="layer-item">
-                    <input
-                      type="checkbox"
-                      checked={!!wwtpStateLayers[s.code]}
-                      onChange={() => toggleWwtpState(s.code)}
-                    />
-                    <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
-                    <span className="layer-label">
-                      {s.name} WWTP ({s.code})
-                    </span>
-                  </label>
+                    </div>
+                    <label className="layer-item">
+                      <input
+                        type="checkbox"
+                        checked={!!stateLayers[s.code]}
+                        onChange={() => toggleState(s.code)}
+                      />
+                      <span className="layer-swatch" style={{ background: LAYER_COLORS.state }} />
+                      <span className="layer-label">CWS systems</span>
+                    </label>
+                    <label className="layer-item">
+                      <input
+                        type="checkbox"
+                        checked={!!wwtpStateLayers[s.code]}
+                        onChange={() => toggleWwtpState(s.code)}
+                      />
+                      <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp }} />
+                      <span className="layer-label">Wastewater plants</span>
+                    </label>
+                    {s.code === 'PA' && (
+                      <>
+                        <label className="layer-item">
+                          <input
+                            type="checkbox"
+                            checked={layers.pa_pws}
+                            onChange={() => toggleLayer('pa_pws')}
+                          />
+                          <span className="layer-swatch" style={{ background: LAYER_COLORS.pa_pws }} />
+                          <span className="layer-label">PWS service area polygons (DEP)</span>
+                        </label>
+                        <label className="layer-item">
+                          <input
+                            type="checkbox"
+                            checked={layers.wwtp_pa}
+                            onChange={() => toggleLayer('wwtp_pa')}
+                          />
+                          <span className="layer-swatch" style={{ background: LAYER_COLORS.wwtp_pa }} />
+                          <span className="layer-label">PA WWTP (detailed filter)</span>
+                        </label>
+                      </>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
             <p className="sources-note">
-              EPA FRS/ICIS wastewater treatment plants (~19k national). Enable state
-              layers or use the national WWTP layer above.
+              Each state nests CWS (EPA) and WWTP (EPA FRS/ICIS). Pennsylvania also includes
+              DEP service-area polygons under PA.
             </p>
           </div>
 
-          <div className="section">
+<div className="section">
             <div className="section-title">Costs (not live)</div>
             <div className="costs-panel">
               <div className="row">
@@ -849,7 +864,7 @@ export default function App() {
             <Source
               id="treatment"
               type="geojson"
-              data={`${BASE}data/sample_water_treatment.geojson`}
+              data={`${BASE}data/drinking_wtp.geojson`}
             >
               <Layer
                 id="treatment-points"

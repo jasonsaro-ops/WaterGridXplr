@@ -485,3 +485,30 @@
     border-bottom: 1px solid #1e3a5f;
   }
 }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid #1e3a5f;
+  flex-shrink: 0;
+}
+.tb-btn {
+  background: #0f2744;
+  border: 1px solid #1e3a5f;
+  color: #e0f2fe;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tb-btn:hover {
+  background: #164e7a;
+  border-color: #0ea5e9;
+  color: #fff;
+}
+.state-nest .layer-item {
+  padding-left: 0.25rem;
+}
