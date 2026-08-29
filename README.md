@@ -116,12 +116,16 @@ Underlying datasets: follow each provider’s terms (public domain for many fede
 
 ## Real data included in this build
 
-| File | Source | Count (approx) |
-|------|--------|----------------|
+| File | Source | Count |
+|------|--------|-------|
+| `nid_dams_full.geojson` | **Full USACE NID** via BTS NTAD | **92,766** dams |
+| `cws_service_centroids.geojson` | **EPA Community Water System** service areas as centroids | **~41,000** systems |
 | `wwtp_major.geojson` | EPA FRS + ICIS Wastewater Treatment Plants (Major) | 2,000 |
-| `wwtp_pa.geojson` | Same, filtered `CWP_STATE='PA'` | ~974 |
-| `dams_high_hazard.geojson` | USACE NID via BTS NTAD (`publicHazardId=1`) | 2,000 |
-| `pa_pws_service_areas.geojson` | PA DEP eMapPA Public Water Supply Service Areas | 300 polygons |
+| `wwtp_pa.geojson` | EPA WWTP filtered to Pennsylvania | ~974 |
+| `pa_pws_service_areas.geojson` | PA DEP eMapPA PWS service area **polygons** | 300 |
+| `dams_high_hazard.geojson` | NID subset (hazard code 1) | 2,000 |
+
+**Why centroids for CWS?** Full national service-area **polygons** (~44k complex multipolygons) are hundreds of MB and not practical as a single static GeoJSON for GitHub Pages. Centroids give a complete national facility/system layer with metadata (PWSID, population served, primacy agency, etc.). PA ships as real polygons as a state template; repeat the same query pattern for other state portals.
 
 Endpoints used (public ArcGIS FeatureServers supporting GeoJSON):
 

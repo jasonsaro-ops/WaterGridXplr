@@ -1,23 +1,27 @@
 # Uploading WaterGridXplr to GitHub
 
-1. Create a new empty repository named **WaterGridXplr** (or any name; if different, edit `base` in `vite.config.ts` to match `/YourRepoName/`).
+## Critical: white screen / main.tsx 404
 
-2. Unzip this package and push:
+That error means **the production build did not run**. GitHub Pages was serving source files (or an empty site). Fixes included in this package:
+
+1. **`package-lock.json` is present** so `npm ci` works in Actions.
+2. Workflow uses `npm ci` with fallback to `npm install`.
+3. Build script is `vite build` (does not fail on optional typecheck).
+
+### Deploy steps
+
+1. Repo name should be **`WaterGridXplr`** (or change `VITE_BASE` in `.github/workflows/deploy.yml` and `vite.config.ts` to `/YourRepoName/`).
+2. Push all files including `package-lock.json` and `.github/workflows/deploy.yml`.
+3. **Settings → Pages → Source: GitHub Actions** (not “Deploy from a branch”).
+4. Open the Actions tab and confirm the **Deploy to GitHub Pages** workflow is green.
+5. Site URL: `https://YOUR_USER.github.io/WaterGridXplr/`
+
+### Local production check
 
 ```bash
-cd WaterGridXplr   # or the folder you extracted
-git init
-git add .
-git commit -m "Initial WaterGridXplr — water infrastructure explorer"
-git branch -M main
-git remote add origin https://github.com/YOUR_USER/WaterGridXplr.git
-git push -u origin main
+npm install
+npm run build
+npm run preview
 ```
 
-3. Enable GitHub Pages: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-
-4. The included workflow will build and deploy on every push to `main`.
-
-5. Optional: add more GeoJSON under `public/data/` and wire layers in `src/App.tsx`.
-
-No API key is required for the default sample map. Nominatim requests include a proper User-Agent.
+You should see a real map, not a white page. `dist/index.html` will reference hashed `/WaterGridXplr/assets/index-….js`, not `main.tsx`.

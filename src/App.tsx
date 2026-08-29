@@ -13,6 +13,7 @@ const LAYER_COLORS = {
   dams: '#a855f7',
   aqueducts: '#22d3ee',
   pa_pws: '#38bdf8',
+  cws: '#14b8a6',
 } as const;
 
 type LayerId = keyof typeof LAYER_COLORS;
@@ -42,15 +43,16 @@ export default function App() {
   const [viewState, setViewState] = useState(INITIAL_VIEW);
   const [layers, setLayers] = useState<Record<LayerId, boolean>>({
     wwtp: true,
-    wwtp_pa: true,
+    wwtp_pa: false,
     treatment: false,
     dams: true,
-    aqueducts: true,
+    aqueducts: false,
     pa_pws: true,
+    cws: true,
   });
   const [popup, setPopup] = useState<PopupInfo | null>(null);
   const [searchQ, setSearchQ] = useState('');
-  const [status] = useState('Live public GIS · EPA FRS/ICIS · NID/NTAD · PA DEP');
+  const [status] = useState('Live public GIS · Full NID · EPA CWS · EPA WWTP · PA DEP');
 
   const toggleLayer = useCallback((id: LayerId) => {
     setLayers((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -97,6 +99,7 @@ export default function App() {
 
   const interactiveLayerIds = useMemo(() => {
     const ids: string[] = [];
+    if (layers.cws) ids.push('cws-points');
     if (layers.wwtp) ids.push('wwtp-points');
     if (layers.wwtp_pa) ids.push('wwtp-pa-points');
     if (layers.treatment) ids.push('treatment-points');
@@ -152,9 +155,9 @@ export default function App() {
                 </div>
               </div>
               <div className="kpi">
-                <div className="kpi-label">NID high-hazard</div>
+                <div className="kpi-label">NID dams</div>
                 <div className="kpi-value">
-                  2,000+ <span className="kpi-unit">loaded</span>
+                  92,766 <span className="kpi-unit">loaded</span>
                 </div>
               </div>
             </div>
@@ -185,10 +188,11 @@ export default function App() {
             <div className="layer-list">
               {(
                 [
+                  { id: 'cws' as LayerId, label: 'CWS service centroids (EPA)', note: '~41k national' },
+                  { id: 'dams' as LayerId, label: 'All NID dams', note: '92,766 national' },
                   { id: 'wwtp' as LayerId, label: 'WWTP Majors (EPA FRS/ICIS)', note: '2,000 national' },
+                  { id: 'pa_pws' as LayerId, label: 'PA PWS service areas', note: '300 polygons' },
                   { id: 'wwtp_pa' as LayerId, label: 'PA wastewater plants', note: '~974 PA' },
-                  { id: 'dams' as LayerId, label: 'High-hazard dams (NID)', note: '2,000 national' },
-                  { id: 'pa_pws' as LayerId, label: 'PA PWS service areas', note: '300 PA (DEP)' },
                   { id: 'aqueducts' as LayerId, label: 'Major aqueduct corridors', note: 'illustrative' },
                   { id: 'treatment' as LayerId, label: 'Drinking WTP samples', note: 'demo plants' },
                 ] as const
@@ -262,6 +266,34 @@ export default function App() {
           attributionControl={true}
         >
           <NavigationControl position="top-right" />
+
+          {layers.cws && (
+            <Source
+              id="cws"
+              type="geojson"
+              data={`${BASE}data/cws_service_centroids.geojson`}
+            >
+              <Layer
+                id="cws-points"
+                type="circle"
+                paint={{
+                  'circle-radius': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    3, 2,
+                    8, 4,
+                    12, 7,
+                  ],
+                  'circle-color': LAYER_COLORS.cws,
+                  'circle-stroke-width': 0.5,
+                  'circle-stroke-color': '#fff',
+                  'circle-opacity': 0.75,
+                }}
+              />
+            </Source>
+          )}
+
 
           {layers.pa_pws && (
             <Source
@@ -339,7 +371,7 @@ export default function App() {
             <Source
               id="dams"
               type="geojson"
-              data={`${BASE}data/dams_high_hazard.geojson`}
+              data={`${BASE}data/nid_dams_full.geojson`}
             >
               <Layer
                 id="dams-points"
@@ -411,6 +443,7 @@ export default function App() {
                 <h3>
                   {String(
                     popup.properties.CWP_NAME ||
+                      popup.properties.PWS_Name ||
                       popup.properties.name ||
                       popup.properties.NAME ||
                       'Feature'
