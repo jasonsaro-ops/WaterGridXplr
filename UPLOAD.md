@@ -1,27 +1,83 @@
-# Uploading WaterGridXplr to GitHub
+# How to put WaterGridXplr on GitHub (correct way)
 
-## Critical: white screen / main.tsx 404
+## Do NOT upload the .zip as one file
 
-That error means **the production build did not run**. GitHub Pages was serving source files (or an empty site). Fixes included in this package:
+If the repo only contains `WaterGridXplr.zip`, the build will fail.
+GitHub needs the **extracted project files at the repository root**.
 
-1. **`package-lock.json` is present** so `npm ci` works in Actions.
-2. Workflow uses `npm ci` with fallback to `npm install`.
-3. Build script is `vite build` (does not fail on optional typecheck).
+## Option A — GitHub website (easiest)
 
-### Deploy steps
+1. Unzip `WaterGridXplr.zip` on your computer.
+2. Open the folder. You should see:
+   - `package.json`
+   - `package-lock.json`
+   - `index.html`
+   - `src/`
+   - `public/`
+   - `.github/workflows/deploy.yml`
+3. Create a new empty repo named **exactly** `WaterGridXplr` (no README if possible).
+4. On the repo page click **Add file → Upload files**.
+5. Drag **all of the extracted files and folders** (not the outer zip) into the browser.
+   - Include the hidden `.github` folder (drag the whole folder).
+6. Commit to `main`.
+7. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+8. Open the **Actions** tab and wait for “Deploy to GitHub Pages” to finish green.
+9. Site: `https://YOUR_USERNAME.github.io/WaterGridXplr/`
 
-1. Repo name should be **`WaterGridXplr`** (or change `VITE_BASE` in `.github/workflows/deploy.yml` and `vite.config.ts` to `/YourRepoName/`).
-2. Push all files including `package-lock.json` and `.github/workflows/deploy.yml`.
-3. **Settings → Pages → Source: GitHub Actions** (not “Deploy from a branch”).
-4. Open the Actions tab and confirm the **Deploy to GitHub Pages** workflow is green.
-5. Site URL: `https://YOUR_USER.github.io/WaterGridXplr/`
-
-### Local production check
+## Option B — git command line
 
 ```bash
-npm install
-npm run build
-npm run preview
+unzip WaterGridXplr.zip
+cd WaterGridXplr          # or WaterGridXplr/WaterGridXplr if double-nested
+# confirm package.json is here:
+ls package.json
+
+git init
+git add .
+git commit -m "WaterGridXplr initial"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/WaterGridXplr.git
+git push -u origin main
 ```
 
-You should see a real map, not a white page. `dist/index.html` will reference hashed `/WaterGridXplr/assets/index-….js`, not `main.tsx`.
+Then enable Pages → Source: **GitHub Actions**.
+
+## Repo layout must look like this
+
+```
+WaterGridXplr/          ← GitHub repository root
+  package.json
+  package-lock.json
+  index.html
+  vite.config.ts
+  src/
+  public/
+  .github/
+    workflows/
+      deploy.yml
+```
+
+Wrong:
+
+```
+WaterGridXplr/
+  WaterGridXplr.zip     ← only a zip = broken
+```
+
+or
+
+```
+WaterGridXplr/
+  WaterGridXplr/        ← nested folder = broken
+    package.json
+```
+
+## If the repo name is not WaterGridXplr
+
+Edit `.github/workflows/deploy.yml` and set:
+
+```yaml
+VITE_BASE: /YourExactRepoName/
+```
+
+and the same in `vite.config.ts`.
