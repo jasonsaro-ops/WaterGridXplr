@@ -46,6 +46,9 @@ const LAYER_COLORS = {
   cws: '#14b8a6',
   state: '#2dd4bf',
   gauges: '#facc15',
+  towers: '#f472b6',
+  reservoirs: '#60a5fa',
+  desal: '#a3e635',
 } as const;
 
 type CoreLayerId = keyof typeof LAYER_COLORS;
@@ -200,11 +203,14 @@ export default function App() {
     wwtp_pa: false,
     treatment: false,
     dams: true,
-    aqueducts: false,
+    aqueducts: true,
     pa_pws: true,
     cws: true,
     state: false,
     gauges: true,
+    towers: true,
+    reservoirs: true,
+    desal: true,
   });
   const [stateLayers, setStateLayers] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(US_STATES.map((s) => [s.code, false]))
@@ -323,6 +329,10 @@ export default function App() {
     if (layers.aqueducts) ids.push('aqueducts-lines');
     if (layers.pa_pws) ids.push('pa-pws-fill', 'pa-pws-outline');
     if (layers.gauges) ids.push('gauge-points');
+    if (layers.towers) ids.push('towers-points');
+    if (layers.reservoirs) ids.push('reservoirs-points');
+    if (layers.desal) ids.push('desal-points');
+    if (layers.aqueducts) ids.push('aqueducts-major-lines');
     for (const s of US_STATES) {
       if (stateLayers[s.code]) ids.push(`state-${s.code}-points`);
       if (wwtpStateLayers[s.code]) ids.push(`wwtp-state-${s.code}-points`);
@@ -547,7 +557,10 @@ export default function App() {
                   { id: 'wwtp' as CoreLayerId, label: 'WWTP all states (EPA)', note: '~19k' },
                   { id: 'pa_pws' as CoreLayerId, label: 'PA service polygons', note: 'DEP' },
                   { id: 'wwtp_pa' as CoreLayerId, label: 'PA WWTP', note: '~974' },
-                  { id: 'aqueducts' as CoreLayerId, label: 'Aqueducts', note: 'sample' },
+                  { id: 'reservoirs' as CoreLayerId, label: 'Major reservoirs (NID ≥50ft)', note: '~6.8k' },
+                  { id: 'aqueducts' as CoreLayerId, label: 'Major aqueducts / canals', note: 'national' },
+                  { id: 'towers' as CoreLayerId, label: 'Water towers (OSM when avail.)', note: 'OSM' },
+                  { id: 'desal' as CoreLayerId, label: 'Desalination plants', note: 'major' },
                   { id: 'treatment' as CoreLayerId, label: 'Drinking WTP samples', note: 'demo' },
                 ] as const
               ).map((l) => (
@@ -852,14 +865,60 @@ export default function App() {
           )}
 
           {layers.aqueducts && (
-            <Source id="aqueducts" type="geojson" data={`${BASE}data/sample_aqueducts.geojson`}>
+            <Source id="aqueducts" type="geojson" data={`${BASE}data/aqueducts_major.geojson`}>
               <Layer
-                id="aqueducts-lines"
+                id="aqueducts-major-lines"
                 type="line"
                 paint={{
                   'line-color': LAYER_COLORS.aqueducts,
-                  'line-width': 3,
-                  'line-opacity': 0.85,
+                  'line-width': 3.5,
+                  'line-opacity': 0.9,
+                }}
+              />
+            </Source>
+          )}
+
+          {layers.reservoirs && (
+            <Source id="reservoirs" type="geojson" data={`${BASE}data/reservoirs_major.geojson`}>
+              <Layer
+                id="reservoirs-points"
+                type="circle"
+                paint={{
+                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 2, 8, 5, 12, 8],
+                  'circle-color': LAYER_COLORS.reservoirs,
+                  'circle-stroke-width': 1,
+                  'circle-stroke-color': '#fff',
+                  'circle-opacity': 0.85,
+                }}
+              />
+            </Source>
+          )}
+
+          {layers.towers && (
+            <Source id="towers" type="geojson" data={`${BASE}data/water_towers.geojson`}>
+              <Layer
+                id="towers-points"
+                type="circle"
+                paint={{
+                  'circle-radius': 6,
+                  'circle-color': LAYER_COLORS.towers,
+                  'circle-stroke-width': 1,
+                  'circle-stroke-color': '#fff',
+                }}
+              />
+            </Source>
+          )}
+
+          {layers.desal && (
+            <Source id="desal" type="geojson" data={`${BASE}data/desalination.geojson`}>
+              <Layer
+                id="desal-points"
+                type="circle"
+                paint={{
+                  'circle-radius': 8,
+                  'circle-color': LAYER_COLORS.desal,
+                  'circle-stroke-width': 1.5,
+                  'circle-stroke-color': '#14532d',
                 }}
               />
             </Source>
